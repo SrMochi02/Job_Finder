@@ -11,10 +11,11 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
-# Credenciales de Gmail
+# Credenciales de Gmail y datos del remitente
 GMAIL_USER: str = os.getenv("GMAIL_USER", "")
 GMAIL_APP_PASSWORD: str = os.getenv("GMAIL_APP_PASSWORD", "")
 REMITENTE_NOMBRE: str = os.getenv("REMITENTE_NOMBRE", "Candidato")
+REMITENTE_TELEFONO: str = os.getenv("REMITENTE_TELEFONO", "")
 
 # Rutas de archivos y directorios
 CV_PATH: Path = Path(os.getenv("CV_PATH", str(BASE_DIR / "cv_postulante.pdf"))).resolve()

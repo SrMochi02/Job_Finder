@@ -7,7 +7,7 @@ Extrae correos electrónicos válidos y números telefónicos de El Salvador
 import re
 import unicodedata
 
-from config import PALABRAS_EXCLUIDAS
+from config import PALABRAS_EXCLUIDAS, REMITENTE_TELEFONO
 
 # Patrón Regex para correos electrónicos válidos
 PATRON_EMAIL = re.compile(
@@ -77,11 +77,14 @@ def extraer_telefonos_sv(texto: str, solo_moviles: bool = False) -> list[str]:
     coincidencias = PATRON_TELEFONO_SV.findall(texto)
     telefonos_limpios: list[str] = []
     vistos: set[str] = set()
+    propio_digitos = re.sub(r"\D", "", REMITENTE_TELEFONO)
 
     for bloque_1, bloque_2 in coincidencias:
         if solo_moviles and not bloque_1.startswith(("6", "7")):
             continue
         numero_normalizado = normalizar_telefono_sv(bloque_1, bloque_2)
+        if propio_digitos and numero_normalizado == propio_digitos:
+            continue
         if numero_normalizado not in vistos:
             vistos.add(numero_normalizado)
             telefonos_limpios.append(numero_normalizado)

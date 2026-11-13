@@ -19,6 +19,7 @@ from config import (
     GMAIL_USER,
     MAX_EMAILS_POR_DIA,
     REMITENTE_NOMBRE,
+    REMITENTE_TELEFONO,
     validar_configuracion_correo,
 )
 from database import (
@@ -50,6 +51,7 @@ def construir_cuerpo_correo(titulo_puesto: str, empresa: str, ubicacion: str) ->
         f"Quedo a su entera disposición para ampliar cualquier información en una entrevista.\n\n"
         f"Atentamente,\n"
         f"{REMITENTE_NOMBRE}\n"
+        f"Teléfono / WhatsApp: {REMITENTE_TELEFONO}\n"
         f"Correo: {GMAIL_USER}\n"
     )
 
