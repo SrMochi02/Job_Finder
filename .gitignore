@@ -1,0 +1,36 @@
+# Entorno virtual
+venv/
+.venv/
+env/
+
+# Variables de entorno y credenciales (JAMÁS subir al repositorio)
+.env
+
+# Base de datos local SQLite
+*.db
+*.sqlite3
+
+# Perfil persistente de navegador (Playwright / WhatsApp Web)
+whatsapp_session/
+playwright_profile/
+browser_data/
+
+# Archivos personales / CV
+*.pdf
+
+# Caché de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Logs
+*.log
+logs/
+
+# IDEs y sistema operativo
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
