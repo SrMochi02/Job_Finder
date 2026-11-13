@@ -1,7 +1,7 @@
 """
 Módulo de Automatización de Correo Electrónico vía SMTP (Fase 3 - Canal 1).
-Envía postulaciones personalizadas con el CV adjunto en PDF, respetando el
-límite diario (Rate Limiting) y pausas aleatorias humanas entre cada envío.
+Envía postulaciones con redacción humana, formal y presentable ("Buen día..."),
+adaptada al área de experiencia del CV, adjuntando el PDF y respetando el Rate Limiting diario.
 """
 
 import logging
@@ -30,28 +30,58 @@ from database import (
 
 logger = logging.getLogger(__name__)
 
+RESUMEN_EXPERIENCIA_POR_AREA: dict[str, str] = {
+    "administrativo_atencion": (
+        "cuento con experiencia comprobada en asistencia administrativa, atención directa "
+        "al cliente, control de caja chica, facturación y manejo de inventarios"
+    ),
+    "logistica_operaciones": (
+        "cuento con experiencia práctica en control físico de inventarios, bodega, recepción "
+        "de pedidos con proveedores y labores operativas de mantenimiento y carga bajo normas de seguridad"
+    ),
+    "sistemas_software": (
+        "soy egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE), "
+        "con manejo de bases de datos SQL, programación, soporte y herramientas de ofimática, "
+        "además de experiencia administrativa y operativa"
+    ),
+}
 
-def construir_cuerpo_correo(titulo_puesto: str, empresa: str, ubicacion: str) -> str:
+
+def construir_cuerpo_correo(
+    titulo_puesto: str,
+    empresa: str,
+    ubicacion: str,
+    area_afinidad: str = "administrativo_atencion",
+) -> str:
     """
-    Genera una plantilla dinámica y profesional adaptada al nombre de la vacante
-    y a la empresa reclutadora en San Miguel.
+    Redacta un correo formal, natural y humano que inicia con 'Buen día',
+    sin frases robóticas ni clichés de IA.
     """
-    destinatario_empresa = (
-        f" del equipo de selección de {empresa}"
-        if empresa and empresa.lower() != "empresa confidencial"
+    mencion_empresa = (
+        f" en {empresa}"
+        if empresa and empresa.strip().lower() != "empresa confidencial"
         else ""
     )
+    experiencia_Acorde = RESUMEN_EXPERIENCIA_POR_AREA.get(
+        area_afinidad,
+        RESUMEN_EXPERIENCIA_POR_AREA["administrativo_atencion"],
+    )
+
+    linea_telefono = (
+        f"Tel. / WhatsApp: {REMITENTE_TELEFONO}\n" if REMITENTE_TELEFONO else ""
+    )
+
     return (
-        f"Estimado/a responsable{destinatario_empresa}:\n\n"
-        f"Le saludo cordialmente. Por medio del presente correo presento mi postulación formal "
-        f"para la vacante de «{titulo_puesto}» ubicada en {ubicacion}.\n\n"
-        f"Adjunto a este mensaje mi Currículum Vitae actualizado en formato PDF para que puedan "
-        f"conocer en detalle mi experiencia, formación técnica y disponibilidad inmediata en la zona "
-        f"de San Miguel.\n\n"
-        f"Quedo a su entera disposición para ampliar cualquier información en una entrevista.\n\n"
-        f"Atentamente,\n"
+        f"Buen día:\n\n"
+        f"Espero que se encuentre muy bien. Le escribo para presentar mi postulación "
+        f"a la plaza de {titulo_puesto}{mencion_empresa}.\n\n"
+        f"Adjunto a este correo mi currículum en formato PDF. Como podrá observar, "
+        f"{experiencia_Acorde}. Resido en {ubicacion} y cuento con disponibilidad "
+        f"inmediata para asistir a una entrevista cuando lo consideren conveniente.\n\n"
+        f"Muchas gracias por su tiempo y consideración.\n\n"
+        f"Saludos cordiales,\n"
         f"{REMITENTE_NOMBRE}\n"
-        f"Teléfono / WhatsApp: {REMITENTE_TELEFONO}\n"
+        f"{linea_telefono}"
         f"Correo: {GMAIL_USER}\n"
     )
 
@@ -61,17 +91,18 @@ def construir_mensaje_email(
     titulo_puesto: str,
     empresa: str,
     ubicacion: str,
+    area_afinidad: str = "administrativo_atencion",
     ruta_cv: Path = CV_PATH,
 ) -> EmailMessage:
     """
-    Crea el objeto EmailMessage con asunto dinámico, cuerpo personalizado
+    Crea el objeto EmailMessage con asunto sobrio y humano, cuerpo personalizado
     y el archivo CV adjunto leído en modo binario ('rb').
     """
     if not ruta_cv.exists():
         raise FileNotFoundError(f"No se encontró el archivo PDF del CV en: {ruta_cv}")
 
     msg = EmailMessage()
-    msg["Subject"] = f"Postulación a vacante: {titulo_puesto} - {REMITENTE_NOMBRE}"
+    msg["Subject"] = f"CV para plaza de {titulo_puesto} - {REMITENTE_NOMBRE}"
     msg["From"] = f"{REMITENTE_NOMBRE} <{GMAIL_USER}>"
     msg["To"] = destinatario
 
@@ -79,6 +110,7 @@ def construir_mensaje_email(
         titulo_puesto=titulo_puesto,
         empresa=empresa,
         ubicacion=ubicacion,
+        area_afinidad=area_afinidad,
     )
     msg.set_content(cuerpo)
 
@@ -99,6 +131,7 @@ def enviar_correo_individual(
     titulo_puesto: str,
     empresa: str,
     ubicacion: str,
+    area_afinidad: str = "administrativo_atencion",
     usar_ssl: bool = True,
     ruta_cv: Path = CV_PATH,
 ) -> tuple[bool, str]:
@@ -111,9 +144,10 @@ def enviar_correo_individual(
         titulo_puesto=titulo_puesto,
         empresa=empresa,
         ubicacion=ubicacion,
+        area_afinidad=area_afinidad,
         ruta_cv=ruta_cv,
     )
-    password_limpia = GMAIL_APP_PASSWORD.replace(" ", "")
+    password_limpia = GMAIL_APP_PASSWORD.replace(" ", "").replace("_", "")
 
     try:
         if usar_ssl:
@@ -137,7 +171,6 @@ def procesar_cola_correos(max_diario: int = MAX_EMAILS_POR_DIA) -> int:
     """
     Procesa las postulaciones pendientes del canal EMAIL respetando el límite diario
     (10-15 correos/día) y aplicando time.sleep(random.uniform(30, 90)) entre envíos.
-    Retorna la cantidad de correos enviados en esta ejecución.
     """
     valido, motivo = validar_configuracion_correo()
     if not valido:
@@ -169,6 +202,7 @@ def procesar_cola_correos(max_diario: int = MAX_EMAILS_POR_DIA) -> int:
         titulo = postulacion["titulo"]
         empresa = postulacion["empresa"]
         ubicacion = postulacion["ubicacion"]
+        area_afinidad = postulacion.get("area_afinidad") or "administrativo_atencion"
 
         logger.info(
             "[EMAIL %d/%d] Enviando postulación para '%s' (%s) -> %s",
@@ -184,6 +218,7 @@ def procesar_cola_correos(max_diario: int = MAX_EMAILS_POR_DIA) -> int:
             titulo_puesto=titulo,
             empresa=empresa,
             ubicacion=ubicacion,
+            area_afinidad=area_afinidad,
         )
 
         if exito:
@@ -194,7 +229,6 @@ def procesar_cola_correos(max_diario: int = MAX_EMAILS_POR_DIA) -> int:
             actualizar_estado_postulacion(postulacion_id, "ERROR", detalle)
             logger.error("[EMAIL ERROR] %s", detalle)
 
-        # Pausa aleatoria entre 30 y 90 segundos si aún quedan más correos por enviar
         if indice < total_pendientes:
             espera = random.uniform(DELAY_MIN_SEGUNDOS, DELAY_MAX_SEGUNDOS)
             logger.info(

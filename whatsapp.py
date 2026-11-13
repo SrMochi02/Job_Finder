@@ -1,8 +1,8 @@
 """
 Módulo de Automatización de WhatsApp Web con Cautela (Fase 4 - Canal 2).
 Utiliza un contexto persistente de Playwright para conservar la sesión tras escanear el QR,
-adjunta el CV en PDF mediante input[type="file"] y limita estrictamente los envíos diarios
-(máximo 5-8 mensajes por día) para proteger el número personal.
+redacta un saludo humano y formal ("Buen día..."), adjunta el CV en PDF mediante input[type="file"]
+y limita estrictamente los envíos diarios (máximo 5-8 mensajes por día).
 """
 
 import logging
@@ -33,7 +33,6 @@ from database import (
 
 logger = logging.getLogger(__name__)
 
-# Selectores resilientes de WhatsApp Web para cuadro de texto, botón de adjuntar y enviar
 SELECTOR_CAJA_MENSAJE = (
     "footer div[contenteditable='true'][data-tab], "
     "div[title='Escribe un mensaje'], "
@@ -55,17 +54,21 @@ SELECTOR_BOTON_ENVIAR = (
 
 
 def construir_mensaje_whatsapp(titulo_puesto: str, empresa: str, ubicacion: str) -> str:
-    """Construye un saludo breve, respetuoso y personalizado para el reclutador en WhatsApp."""
+    """
+    Construye un saludo formal, directo y 100% humano ('Buen día...'),
+    sin formato robótico ni asteriscos artificiales.
+    """
     mencion_empresa = (
-        f" de *{empresa}*"
-        if empresa and empresa.lower() != "empresa confidencial"
+        f" en {empresa}"
+        if empresa and empresa.strip().lower() != "empresa confidencial"
         else ""
     )
     return (
-        f"Buen día, estimado/a reclutador/a{mencion_empresa}. "
-        f"Le saluda {REMITENTE_NOMBRE}. Vi su publicación para la vacante de "
-        f"*{titulo_puesto}* en {ubicacion} y le comparto por este medio mi CV en formato PDF. "
-        f"Quedo atento/a a sus comentarios. ¡Muchas gracias!"
+        f"Buen día, le saluda {REMITENTE_NOMBRE}. "
+        f"Vi su publicación para la plaza de {titulo_puesto}{mencion_empresa} "
+        f"y por este medio le comparto mi currículum en PDF para su consideración. "
+        f"Resido en {ubicacion} y cuento con disponibilidad inmediata. "
+        f"Muchas gracias por su tiempo, quedo atento a sus comentarios."
     )
 
 
@@ -97,7 +100,6 @@ def enviar_whatsapp_en_pagina(
         # Esperar explícitamente a que cargue el cuadro de texto (permite escanear QR la 1ra vez)
         pagina.wait_for_selector(SELECTOR_CAJA_MENSAJE, timeout=90000)
 
-        # Enviar el mensaje de texto inicial o adjuntar directamente el PDF
         boton_adjuntar = pagina.wait_for_selector(
             SELECTOR_BOTON_ADJUNTAR, timeout=15000
         )
@@ -105,7 +107,6 @@ def enviar_whatsapp_en_pagina(
             return False, "No se encontró el botón de adjuntar (clip/plus)"
         boton_adjuntar.click()
 
-        # Localizar el input[type="file"] para documentos y cargar el PDF sin ventana del SO
         input_file = pagina.query_selector(SELECTOR_INPUT_DOCUMENTO)
         if not input_file:
             input_file = pagina.wait_for_selector(
@@ -116,17 +117,14 @@ def enviar_whatsapp_en_pagina(
 
         input_file.set_input_files(str(ruta_cv.resolve()))
 
-        # Esperar explícitamente a que aparezca la vista previa del documento y el botón de enviar
         boton_enviar = pagina.wait_for_selector(SELECTOR_BOTON_ENVIAR, timeout=20000)
         if not boton_enviar:
             return False, "No apareció el botón de enviar tras adjuntar el PDF"
 
         boton_enviar.click()
 
-        # Esperar a que el cuadro principal de chat vuelva a estar activo y se registre el envío
         pagina.wait_for_selector(SELECTOR_CAJA_MENSAJE, timeout=15000)
 
-        # Si el texto codificado quedó en la caja principal después de enviar el documento, enviarlo también
         caja_texto = pagina.query_selector(SELECTOR_CAJA_MENSAJE)
         if caja_texto and (caja_texto.inner_text() or "").strip():
             caja_texto.press("Enter")
@@ -149,8 +147,7 @@ def procesar_cola_whatsapp(
 ) -> int:
     """
     Procesa las postulaciones pendientes del canal WHATSAPP usando launch_persistent_context.
-    Respeta la regla de supervivencia: máximo 5-8 mensajes por día y solo a números extraídos
-    de ofertas laborales.
+    Respeta la regla de supervivencia: máximo 5-8 mensajes por día.
     """
     if not ruta_cv.exists():
         logger.warning(
@@ -158,7 +155,6 @@ def procesar_cola_whatsapp(
         )
         return 0
 
-    # Asegurar que el tope diario nunca supere el rango seguro (5-8 por día)
     limite_seguro = min(max_diario, 8)
     enviados_hoy = contar_envios_hoy("WHATSAPP")
     cupo_restante = max(0, limite_seguro - enviados_hoy)
@@ -183,7 +179,7 @@ def procesar_cola_whatsapp(
     with sync_playwright() as p:
         contexto = p.chromium.launch_persistent_context(
             user_data_dir=str(directorio_sesion),
-            headless=False,  # Siempre visible para permitir escaneo QR y evitar huella headless
+            headless=False,
             viewport={"width": 1280, "height": 800},
         )
         pagina = contexto.pages[0] if contexto.pages else contexto.new_page()
