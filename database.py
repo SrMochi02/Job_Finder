@@ -1,16 +1,28 @@
 """
 Módulo de Base de Datos Relacional en SQLite (Fase 1).
-Gestiona las tablas 'vacantes' y 'postulaciones' para evitar postularse
-dos veces a la misma oferta o reclutador en San Miguel.
+Gestiona las tablas 'vacantes' y 'postulaciones', almacenando toda la información
+de la empresa reclutadora, el área de afinidad con el CV y el seguimiento de entrevistas
+(si la empresa llamó a entrevista o no).
 """
 
+import csv
 import hashlib
 import sqlite3
-from datetime import datetime, date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-from config import DB_PATH
+from config import BASE_DIR, DB_PATH
+
+COLUMNAS_ADICIONALES_VACANTES: dict[str, str] = {
+    "area_afinidad": "TEXT DEFAULT 'general'",
+    "salario_ofrecido": "TEXT DEFAULT 'No especificado'",
+    "correos_empresa": "TEXT DEFAULT ''",
+    "telefonos_empresa": "TEXT DEFAULT ''",
+    "resumen_oferta": "TEXT DEFAULT ''",
+    "llamaron_entrevista": "TEXT DEFAULT 'NO'",
+    "notas_entrevista": "TEXT DEFAULT ''",
+}
 
 
 def obtener_conexion(db_path: Path = DB_PATH) -> sqlite3.Connection:
@@ -33,11 +45,10 @@ def generar_hash_vacante(titulo: str, empresa: str, portal: str) -> str:
 
 
 def inicializar_bd(db_path: Path = DB_PATH) -> None:
-    """Crea las tablas 'vacantes' y 'postulaciones' si no existen."""
+    """Crea las tablas 'vacantes' y 'postulaciones' y asegura todas las columnas de empresa/entrevista."""
     with obtener_conexion(db_path) as conn:
         cursor = conn.cursor()
 
-        # Tabla principal de vacantes detectadas
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS vacantes (
@@ -48,12 +59,27 @@ def inicializar_bd(db_path: Path = DB_PATH) -> None:
                 ubicacion TEXT NOT NULL,
                 url_original TEXT NOT NULL,
                 descripcion_cruda TEXT NOT NULL,
-                fecha_deteccion TEXT NOT NULL
+                fecha_deteccion TEXT NOT NULL,
+                area_afinidad TEXT DEFAULT 'general',
+                salario_ofrecido TEXT DEFAULT 'No especificado',
+                correos_empresa TEXT DEFAULT '',
+                telefonos_empresa TEXT DEFAULT '',
+                resumen_oferta TEXT DEFAULT '',
+                llamaron_entrevista TEXT DEFAULT 'NO',
+                notas_entrevista TEXT DEFAULT ''
             );
             """
         )
 
-        # Tabla relacional de postulaciones por canal (EMAIL o WHATSAPP)
+        # Migración automática segura si la tabla ya existía de una versión previa
+        cursor.execute("PRAGMA table_info(vacantes);")
+        columnas_existentes = {fila["name"] for fila in cursor.fetchall()}
+        for col_nombre, col_tipo in COLUMNAS_ADICIONALES_VACANTES.items():
+            if col_nombre not in columnas_existentes:
+                cursor.execute(
+                    f"ALTER TABLE vacantes ADD COLUMN {col_nombre} {col_tipo};"
+                )
+
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS postulaciones (
@@ -70,7 +96,6 @@ def inicializar_bd(db_path: Path = DB_PATH) -> None:
             """
         )
 
-        # Índices para acelerar búsquedas de estado y conteo diario
         cursor.execute(
             """
             CREATE INDEX IF NOT EXISTS idx_postulaciones_estado_canal
@@ -93,10 +118,15 @@ def guardar_vacante(
     url_original: str,
     descripcion_cruda: str,
     portal: str = "Computrabajo",
+    area_afinidad: str = "general",
+    salario_ofrecido: str = "No especificado",
+    correos_empresa: str = "",
+    telefonos_empresa: str = "",
+    resumen_oferta: str = "",
     db_path: Path = DB_PATH,
 ) -> tuple[str, bool]:
     """
-    Inserta una vacante si no existe previamente en la base de datos.
+    Inserta una vacante junto con toda la información extraída de la empresa.
     Retorna (vacante_id, es_nueva).
     """
     vacante_id = generar_hash_vacante(titulo=titulo, empresa=empresa, portal=portal)
@@ -111,8 +141,10 @@ def guardar_vacante(
         cursor.execute(
             """
             INSERT INTO vacantes (
-                id, portal, titulo, empresa, ubicacion, url_original, descripcion_cruda, fecha_deteccion
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                id, portal, titulo, empresa, ubicacion, url_original, descripcion_cruda,
+                fecha_deteccion, area_afinidad, salario_ofrecido, correos_empresa,
+                telefonos_empresa, resumen_oferta, llamaron_entrevista, notas_entrevista
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NO', '');
             """,
             (
                 vacante_id,
@@ -123,6 +155,11 @@ def guardar_vacante(
                 url_original.strip(),
                 descripcion_cruda.strip(),
                 ahora,
+                area_afinidad.strip(),
+                salario_ofrecido.strip(),
+                correos_empresa.strip(),
+                telefonos_empresa.strip(),
+                resumen_oferta.strip(),
             ),
         )
         conn.commit()
@@ -139,7 +176,6 @@ def registrar_postulacion_pendiente(
     Registra una postulación en estado PENDIENTE para un canal ('EMAIL' o 'WHATSAPP').
     Evita duplicados para la misma vacante/contacto o si ya se envió previamente
     al mismo contacto para un puesto con igual título.
-    Retorna True si se agendó como nueva postulación pendiente, False si ya existía.
     """
     canal_upper = canal.strip().upper()
     contacto_limpio = contacto_destino.strip()
@@ -147,7 +183,6 @@ def registrar_postulacion_pendiente(
     with obtener_conexion(db_path) as conn:
         cursor = conn.cursor()
 
-        # Verificar si ya se envió o está pendiente para este mismo contacto y vacante
         cursor.execute(
             """
             SELECT id FROM postulaciones
@@ -158,8 +193,6 @@ def registrar_postulacion_pendiente(
         if cursor.fetchone() is not None:
             return False
 
-        # Prevención adicional: verificar si ya enviamos con éxito a este mismo contacto
-        # en otra publicación idéntica o repetida de la misma empresa
         cursor.execute(
             """
             SELECT p.id
@@ -193,7 +226,7 @@ def obtener_postulaciones_pendientes(
 ) -> list[dict[str, Any]]:
     """
     Devuelve la lista de postulaciones en estado PENDIENTE para el canal especificado,
-    uniendo los datos de la vacante (título, empresa, ubicación, url_original).
+    uniendo los datos de la vacante (título, empresa, ubicación, area_afinidad, url_original).
     """
     canal_upper = canal.strip().upper()
     with obtener_conexion(db_path) as conn:
@@ -210,6 +243,7 @@ def obtener_postulaciones_pendientes(
                 v.titulo,
                 v.empresa,
                 v.ubicacion,
+                v.area_afinidad,
                 v.url_original
             FROM postulaciones p
             JOIN vacantes v ON p.vacante_id = v.id
@@ -253,10 +287,10 @@ def actualizar_estado_postulacion(
 def contar_envios_hoy(canal: str, db_path: Path = DB_PATH) -> int:
     """
     Cuenta cuántas postulaciones han sido marcadas como 'ENVIADO' en la fecha actual
-    para el canal indicado ('EMAIL' o 'WHATSAPP'). Usado para Rate Limiting diario.
+    para el canal indicado ('EMAIL' o 'WHATSAPP').
     """
     canal_upper = canal.strip().upper()
-    prefijo_hoy = date.today().isoformat()  # Formato YYYY-MM-DD
+    prefijo_hoy = date.today().isoformat()
 
     with obtener_conexion(db_path) as conn:
         cursor = conn.cursor()
@@ -272,3 +306,107 @@ def contar_envios_hoy(canal: str, db_path: Path = DB_PATH) -> int:
         )
         fila = cursor.fetchone()
         return int(fila["total"]) if fila else 0
+
+
+def registrar_respuesta_entrevista(
+    criterio: str,
+    llamaron: bool = True,
+    notas: str = "",
+    db_path: Path = DB_PATH,
+) -> int:
+    """
+    Permite marcar si una empresa llamó para entrevista ('SI' o 'NO') buscando por
+    prefijo del ID de vacante o por nombre de la empresa. Retorna cuántas filas actualizó.
+    """
+    valor_llamaron = "SI" if llamaron else "NO"
+    criterio_limpio = criterio.strip()
+
+    with obtener_conexion(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE vacantes
+            SET llamaron_entrevista = ?,
+                notas_entrevista = ?
+            WHERE id LIKE ? OR lower(empresa) LIKE ? OR lower(titulo) LIKE ?;
+            """,
+            (
+                valor_llamaron,
+                notas.strip(),
+                f"{criterio_limpio}%",
+                f"%{criterio_limpio.lower()}%",
+                f"%{criterio_limpio.lower()}%",
+            ),
+        )
+        conn.commit()
+        return cursor.rowcount
+
+
+def obtener_directorio_empresas(db_path: Path = DB_PATH) -> list[dict[str, Any]]:
+    """
+    Obtiene toda la información consolidada de cada empresa, vacante, canales de contacto,
+    estado de envío del CV y si llamaron o no a entrevista.
+    """
+    with obtener_conexion(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT
+                substr(v.id, 1, 8) AS codigo_corto,
+                v.id AS vacante_id,
+                v.fecha_deteccion,
+                v.portal,
+                v.empresa,
+                v.titulo,
+                v.ubicacion,
+                v.area_afinidad,
+                v.salario_ofrecido,
+                v.correos_empresa,
+                v.telefonos_empresa,
+                v.llamaron_entrevista,
+                v.notas_entrevista,
+                v.url_original,
+                v.resumen_oferta,
+                GROUP_CONCAT(p.canal || ':' || p.contacto_destino || '(' || p.estado || ')', ' | ') AS estado_postulaciones
+            FROM vacantes v
+            LEFT JOIN postulaciones p ON v.id = p.vacante_id
+            GROUP BY v.id
+            ORDER BY v.fecha_deteccion DESC;
+            """
+        )
+        return [dict(fila) for fila in cursor.fetchall()]
+
+
+def exportar_reporte_empresas_csv(
+    ruta_csv: Path = BASE_DIR / "reporte_empresas.csv",
+    db_path: Path = DB_PATH,
+) -> Path:
+    """
+    Exporta un archivo CSV (abrible en Excel) con toda la información de las empresas,
+    teléfonos, correos, puesto, estado de envío y columna 'llamaron_entrevista' (SI/NO).
+    """
+    registros = obtener_directorio_empresas(db_path=db_path)
+    columnas = [
+        "codigo_corto",
+        "fecha_deteccion",
+        "empresa",
+        "titulo",
+        "ubicacion",
+        "area_afinidad",
+        "salario_ofrecido",
+        "correos_empresa",
+        "telefonos_empresa",
+        "estado_postulaciones",
+        "llamaron_entrevista",
+        "notas_entrevista",
+        "portal",
+        "url_original",
+        "resumen_oferta",
+    ]
+    with open(ruta_csv, mode="w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.DictWriter(f, fieldnames=columnas, extrasaction="ignore")
+        writer.writeheader()
+        for fila in registros:
+            writer.writerow(fila)
+
+    return ruta_csv
