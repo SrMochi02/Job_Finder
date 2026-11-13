@@ -15,8 +15,9 @@ whatsapp_session/
 playwright_profile/
 browser_data/
 
-# Archivos personales / CV
+# Archivos personales / CV y reportes locales
 *.pdf
+*.csv
 
 # Caché de Python
 __pycache__/

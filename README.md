@@ -44,7 +44,16 @@ Edita tu archivo `.env` (basado en `.env.example`) con tu correo de Gmail, tu Co
 ## Modos de Ejecución (`main.py`)
 
 ```bash
-# Probar flujo de base de datos y parser con una vacante simulada (sin enviar mensajes reales)
+# Dejar activo en el curso de 7:00 AM a 4:00 PM buscando ofertas afines al CV y enviando postulaciones
+python main.py --jornada
+
+# Ver todas las empresas extraídas, sus teléfonos/correos y exportar reporte_empresas.csv para Excel
+python main.py --empresas
+
+# Marcar que una empresa sí te llamó para entrevista
+python main.py --marcar-entrevista "Nombre de la Empresa" --notas "Entrevista martes 9:00 AM"
+
+# Probar flujo de base de datos, filtro anti-cocina y afinidad de CV sin enviar mensajes reales
 python main.py --demo
 
 # Ejecutar únicamente recolección y guardado en BD (ETL)
@@ -55,9 +64,6 @@ python main.py --solo-email
 
 # Procesar únicamente la cola pendiente de WhatsApp Web
 python main.py --solo-whatsapp
-
-# Ejecutar el ciclo completo (ETL + Correo + WhatsApp)
-python main.py
 ```
 
 ---
