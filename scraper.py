@@ -13,6 +13,7 @@ from urllib.parse import urljoin
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 from config import HEADLESS_SCRAPER, PAGINAS_MAXIMAS, UBICACION_OBJETIVO
+from parser import es_oferta_excluida
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +129,17 @@ def extraer_ofertas_portal(
                         if nodo_ubicacion
                         else UBICACION_OBJETIVO
                     )
+
+                    excluida, motivo_exclusion = es_oferta_excluida(titulo, empresa)
+                    if excluida:
+                        logger.info(
+                            "[%s] Oferta descartada por filtro ('%s'): %s (%s)",
+                            nombre_portal,
+                            motivo_exclusion,
+                            titulo,
+                            empresa,
+                        )
+                        continue
 
                     resumenes_ofertas.append(
                         {

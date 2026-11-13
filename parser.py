@@ -5,6 +5,9 @@ Extrae correos electrónicos válidos y números telefónicos de El Salvador
 """
 
 import re
+import unicodedata
+
+from config import PALABRAS_EXCLUIDAS
 
 # Patrón Regex para correos electrónicos válidos
 PATRON_EMAIL = re.compile(
@@ -98,3 +101,37 @@ def extraer_contactos_oferta(descripcion_cruda: str) -> dict[str, list[str]]:
         "telefonos": extraer_telefonos_sv(descripcion_cruda, solo_moviles=False),
         "whatsapp": extraer_telefonos_sv(descripcion_cruda, solo_moviles=True),
     }
+
+
+def _quitar_acentos(texto: str) -> str:
+    """Normaliza un texto en minúsculas y sin tildes para comparaciones limpias."""
+    nfkd = unicodedata.normalize("NFKD", texto.lower())
+    return "".join(c for c in nfkd if not unicodedata.combining(c))
+
+
+def es_oferta_excluida(
+    titulo: str,
+    empresa: str = "",
+    palabras_excluidas: list[str] | None = None,
+) -> tuple[bool, str]:
+    """
+    Verifica si el título o nombre de la empresa pertenece a un sector excluido
+    (por defecto el sector de cocina, restaurantes, gastronomía, etc.).
+    Retorna (True, palabra_detectada) si debe descartarse, o (False, "") si es válida.
+    """
+    lista_excluidas = (
+        palabras_excluidas if palabras_excluidas is not None else PALABRAS_EXCLUIDAS
+    )
+    texto_objetivo = _quitar_acentos(f"{titulo} {empresa}")
+
+    for termino in lista_excluidas:
+        termino_limpio = _quitar_acentos(termino.strip())
+        if not termino_limpio:
+            continue
+        # Coincidencia por palabra completa o frase exacta
+        patron = rf"\b{re.escape(termino_limpio)}\b"
+        if re.search(patron, texto_objetivo):
+            return True, termino.strip()
+
+    return False, ""
+

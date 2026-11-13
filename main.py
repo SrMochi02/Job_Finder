@@ -18,7 +18,7 @@ from database import (
     registrar_postulacion_pendiente,
 )
 from mailer import procesar_cola_correos
-from parser import extraer_contactos_oferta
+from parser import es_oferta_excluida, extraer_contactos_oferta
 from scraper import ejecutar_scraping_todos_los_portales
 from whatsapp import procesar_cola_whatsapp
 
@@ -43,11 +43,24 @@ def procesar_ofertas_extraidas(ofertas: list[dict[str, Any]]) -> dict[str, int]:
     estadisticas = {
         "vacantes_nuevas": 0,
         "vacantes_duplicadas": 0,
+        "vacantes_excluidas": 0,
         "emails_agendados": 0,
         "whatsapp_agendados": 0,
     }
 
     for oferta in ofertas:
+        excluida, palabra = es_oferta_excluida(
+            oferta["titulo"], oferta.get("empresa", "")
+        )
+        if excluida:
+            estadisticas["vacantes_excluidas"] += 1
+            logger.info(
+                "Ignorando vacante del sector excluido ('%s'): %s",
+                palabra,
+                oferta["titulo"],
+            )
+            continue
+
         vacante_id, es_nueva = guardar_vacante(
             titulo=oferta["titulo"],
             empresa=oferta["empresa"],

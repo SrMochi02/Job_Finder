@@ -32,6 +32,17 @@ HEADLESS_SCRAPER: bool = os.getenv("HEADLESS_SCRAPER", "False").strip().lower() 
     "yes",
 )
 
+# Palabras clave excluidas (ej. sector de cocina / restaurantes)
+_EXCLUIDAS_DEFAULT = (
+    "cocina,cocinero,cocinera,chef,mesero,mesera,lavaplatos,restaurante,"
+    "pupuseria,panadero,pastelero,barista,parrillero,comida rapida,gastronomia,bartender,steward"
+)
+PALABRAS_EXCLUIDAS: list[str] = [
+    palabra.strip().lower()
+    for palabra in os.getenv("PALABRAS_EXCLUIDAS", _EXCLUIDAS_DEFAULT).split(",")
+    if palabra.strip()
+]
+
 # Límites diarios y tiempos de espera (Rate Limiting)
 MAX_EMAILS_POR_DIA: int = int(os.getenv("MAX_EMAILS_POR_DIA", "12"))
 MAX_WHATSAPP_POR_DIA: int = int(os.getenv("MAX_WHATSAPP_POR_DIA", "6"))
