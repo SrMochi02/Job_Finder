@@ -9,6 +9,7 @@ import logging
 import random
 import time
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 
 from playwright.sync_api import (
@@ -23,6 +24,7 @@ from config import (
     DELAY_MIN_SEGUNDOS,
     MAX_WHATSAPP_POR_DIA,
     REMITENTE_NOMBRE,
+    REMITENTE_TELEFONO,
     WHATSAPP_SESSION_DIR,
 )
 from database import (
@@ -140,6 +142,62 @@ def enviar_whatsapp_en_pagina(
         return False, f"Error inesperado en WhatsApp Web para {telefono_503}: {exc}"
 
 
+def _lanzar_contexto_whatsapp(p: Any, directorio_sesion: Path) -> Any:
+    """Lanza el navegador persistente para WhatsApp Web con banderas limpias."""
+    directorio_sesion.mkdir(parents=True, exist_ok=True)
+    opciones = {
+        "user_data_dir": str(directorio_sesion),
+        "headless": False,
+        "viewport": {"width": 1280, "height": 800},
+        "ignore_default_args": ["--enable-automation"],
+        "args": [
+            "--disable-blink-features=AutomationControlled",
+            "--no-default-browser-check",
+        ],
+    }
+    try:
+        return p.chromium.launch_persistent_context(channel="chrome", **opciones)
+    except Exception:
+        return p.chromium.launch_persistent_context(**opciones)
+
+
+def iniciar_sesion_whatsapp(directorio_sesion: Path = WHATSAPP_SESSION_DIR) -> None:
+    """
+    Abre WhatsApp Web en el perfil persistente (whatsapp_session/) para que el usuario
+    escanee el código QR con calma una sola vez y deje sincronizados sus chats.
+    """
+    logger.info(
+        "Abriendo WhatsApp Web en %s para vincular código QR...",
+        directorio_sesion,
+    )
+    with sync_playwright() as p:
+        try:
+            contexto = _lanzar_contexto_whatsapp(p, directorio_sesion)
+        except Exception as exc:
+            logger.error(
+                "No se pudo abrir WhatsApp Web porque otra ventana ya está usando la sesión: %s",
+                exc,
+            )
+            return
+
+        pagina = contexto.pages[0] if contexto.pages else contexto.new_page()
+        pagina.goto("https://web.whatsapp.com/", wait_until="domcontentloaded")
+        print("\n" + "=" * 80)
+        print(
+            f"1. Escanea el código QR en la ventana de WhatsApp Web con tu celular ({REMITENTE_TELEFONO or 'tu número'})."
+        )
+        print("2. Espera unos segundos a que carguen tus chats en pantalla.")
+        print("3. Cuando ya veas tus chats cargados, vuelve a esta ventana negra y presiona ENTER.")
+        print("=" * 80 + "\n")
+        try:
+            input("Presiona ENTER cuando tu WhatsApp Web ya esté vinculado y cargado...")
+        except EOFError:
+            time.sleep(30)
+        finally:
+            contexto.close()
+    logger.info("Sesión de WhatsApp Web guardada exitosamente en %s", directorio_sesion)
+
+
 def procesar_cola_whatsapp(
     max_diario: int = MAX_WHATSAPP_POR_DIA,
     directorio_sesion: Path = WHATSAPP_SESSION_DIR,
@@ -177,11 +235,7 @@ def procesar_cola_whatsapp(
     total_pendientes = len(pendientes)
 
     with sync_playwright() as p:
-        contexto = p.chromium.launch_persistent_context(
-            user_data_dir=str(directorio_sesion),
-            headless=False,
-            viewport={"width": 1280, "height": 800},
-        )
+        contexto = _lanzar_contexto_whatsapp(p, directorio_sesion)
         pagina = contexto.pages[0] if contexto.pages else contexto.new_page()
 
         try:

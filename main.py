@@ -35,7 +35,7 @@ from parser import (
     extraer_metadatos_empresa,
 )
 from scraper import ejecutar_scraping_todos_los_portales, iniciar_sesion_portales
-from whatsapp import procesar_cola_whatsapp
+from whatsapp import iniciar_sesion_whatsapp, procesar_cola_whatsapp
 
 logging.basicConfig(
     level=logging.INFO,
@@ -367,6 +367,11 @@ def parsear_argumentos() -> argparse.Namespace:
         help="Abre el navegador persistente para iniciar sesión una vez en Computrabajo y habilitar la auto-postulación.",
     )
     parser.add_argument(
+        "--login-whatsapp",
+        action="store_true",
+        help="Abre WhatsApp Web en el perfil persistente para escanear el código QR por adelantado.",
+    )
+    parser.add_argument(
         "--demo",
         action="store_true",
         help="Prueba el filtro de CV y guardado de empresas con datos simulados sin enviar mensajes.",
@@ -379,6 +384,8 @@ if __name__ == "__main__":
 
     if args.login_portales:
         iniciar_sesion_portales()
+    elif args.login_whatsapp:
+        iniciar_sesion_whatsapp()
     elif args.empresas:
         mostrar_resumen_empresas()
     elif args.marcar_entrevista:
