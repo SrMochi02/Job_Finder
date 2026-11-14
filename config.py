@@ -47,7 +47,7 @@ PALABRAS_EXCLUIDAS: list[str] = [
     if palabra.strip()
 ]
 
-# Áreas de afinidad asociadas al CV (Administración/Atención al Cliente, Logística/Operaciones, Software/IT)
+# Áreas de afinidad asociadas al CV y otros ámbitos laborales accesibles (excepto cocina)
 PERFIL_AFINIDAD_CV: dict[str, list[str]] = {
     "administrativo_atencion": [
         "administrativo",
@@ -60,6 +60,7 @@ PERFIL_AFINIDAD_CV: dict[str, list[str]] = {
         "recepcionista",
         "caja",
         "cajero",
+        "cajera",
         "facturacion",
         "digitador",
         "oficina",
@@ -68,10 +69,10 @@ PERFIL_AFINIDAD_CV: dict[str, list[str]] = {
         "secretaria",
         "archivo",
         "call center",
-        "asesor",
-        "ejecutivo",
-        "ventas",
         "clinica",
+        "hospital",
+        "cobros",
+        "creditos",
     ],
     "logistica_operaciones": [
         "inventario",
@@ -94,29 +95,65 @@ PERFIL_AFINIDAD_CV: dict[str, list[str]] = {
         "orden",
         "suministros",
         "kardex",
+        "produccion",
+        "empaque",
+        "reparto",
+        "mensajero",
     ],
-    "sistemas_software": [
-        "software",
-        "programador",
-        "desarrollador",
-        "sistemas",
+    "ventas_comercial": [
+        "ventas",
+        "vendedor",
+        "asesor",
+        "ejecutivo",
+        "comercial",
+        "promotor",
+        "impulsador",
+        "mostrador",
+        "tienda",
+        "sucursal",
+        "agencia",
+    ],
+    "soporte_sistemas": [
         "soporte",
         "soporte tecnico",
+        "sistemas",
         "informatica",
         "computacion",
-        "base de datos",
-        "sql",
-        "java",
-        "c#",
         "tecnico",
         "tecnologia",
         "it",
         "ti",
         "redes",
         "helpdesk",
+        "mantenimiento de computadoras",
+    ],
+    "programacion_software": [
+        "software",
+        "programador",
+        "desarrollador",
+        "base de datos",
+        "sql",
+        "java",
+        "c#",
+        ".net",
         "qa",
         "tester",
+        "web",
+        "junior",
     ],
+}
+
+# Guía práctica de preparación cuando el sistema detecta ofertas de Software / TI
+GUIAS_PREPARACION_TECH: dict[str, str] = {
+    "sql": "Repasar consultas SQL prácticas: SELECT, INNER JOIN, GROUP BY, filtros WHERE y cómo hacer un CRUD básico.",
+    "base de datos": "Repasar diseño de tablas relacionales (llaves primarias/foráneas), normalización y respaldos.",
+    "c#": "Repasar sintaxis de C#, Programación Orientada a Objetos (clases, herencia) y conexión a SQL Server con .NET.",
+    "java": "Repasar estructura de clases en Java, colecciones (ArrayList, HashMap), manejo de excepciones y JDBC.",
+    "programador": "Preparar 1 o 2 proyectos que hiciste en ITCA o en el Bachillerato para explicar cómo resolviste la lógica.",
+    "desarrollador": "Repasar lógica de programación, control de versiones con Git y cómo explicar tu flujo de trabajo en equipo.",
+    "soporte": "Repasar diagnóstico de PC, instalación de Windows/Office, configuración de impresoras y red local (IP/DNS).",
+    "redes": "Repasar cableado estructurado, configuración básica de routers/switches, ping, ipconfig y subredes.",
+    "excel": "Repasar tablas dinámicas, BUSCARV/XLOOKUP, filtros avanzados y fórmulas condicionales (SI, SUMAR.SI).",
 }
 
 # Horario de operación continua (7:00 AM a 4:00 PM por defecto)

@@ -96,10 +96,15 @@ def procesar_ofertas_extraidas(ofertas: list[dict[str, Any]]) -> dict[str, int]:
             )
             continue
 
-        # 3. Extraer toda la información disponible de la empresa
-        info_empresa = extraer_metadatos_empresa(descripcion)
+        # 3. Extraer toda la información disponible de la empresa y guía de preparación
+        info_empresa = extraer_metadatos_empresa(
+            descripcion_cruda=descripcion,
+            titulo=titulo,
+            area_afinidad=area_afinidad,
+        )
         correos_str = ", ".join(info_empresa["emails"])
         telefonos_str = ", ".join(info_empresa["telefonos_todos"])
+        consejo_prep = info_empresa["consejo_preparacion"]
 
         vacante_id, es_nueva = guardar_vacante(
             titulo=titulo,
@@ -113,7 +118,16 @@ def procesar_ofertas_extraidas(ofertas: list[dict[str, Any]]) -> dict[str, int]:
             correos_empresa=correos_str,
             telefonos_empresa=telefonos_str,
             resumen_oferta=info_empresa["resumen_oferta"],
+            consejo_preparacion=consejo_prep,
         )
+
+        if es_nueva and area_afinidad in ("programacion_software", "soporte_sistemas"):
+            logger.warning(
+                "🌟 OFERTA DE TECNOLOGÍA DETECTADA: '%s' en '%s' -> %s",
+                titulo,
+                empresa,
+                consejo_prep,
+            )
 
         if es_nueva:
             estadisticas["vacantes_nuevas"] += 1
@@ -173,6 +187,11 @@ def mostrar_resumen_empresas() -> None:
             f"{emp['llamaron_entrevista']:<10} | "
             f"{contactos[:35]}"
         )
+        if emp.get("consejo_preparacion") and emp.get("area_afinidad") in (
+            "programacion_software",
+            "soporte_sistemas",
+        ):
+            print(f"   └── 💡 PREPARACIÓN: {emp['consejo_preparacion']}")
     print("=" * 95)
     print(f"Reporte completo exportado para Excel en: {ruta_csv}\n")
 

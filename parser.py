@@ -8,7 +8,12 @@ import re
 import unicodedata
 from typing import Any
 
-from config import PALABRAS_EXCLUIDAS, PERFIL_AFINIDAD_CV, REMITENTE_TELEFONO
+from config import (
+    GUIAS_PREPARACION_TECH,
+    PALABRAS_EXCLUIDAS,
+    PERFIL_AFINIDAD_CV,
+    REMITENTE_TELEFONO,
+)
 
 # Patrón Regex para correos electrónicos válidos
 PATRON_EMAIL = re.compile(
@@ -168,27 +173,25 @@ def es_oferta_excluida(
 
 def evaluar_afinidad_cv(titulo: str, descripcion: str = "") -> tuple[bool, str]:
     """
-    Evalúa si la oferta laboral está asociada al perfil del CV:
-    1. Administración, Atención al Cliente, Recepción y Caja
-    2. Logística, Inventarios, Bodega, Compras, Mantenimiento y Carga Operativa
-    3. Desarrollo de Software, Soporte Técnico, Base de Datos y Sistemas (ITCA)
+    Evalúa el ámbito laboral de la oferta:
+    1. Administración, Atención al Cliente, Recepción y Caja ('administrativo_atencion')
+    2. Logística, Inventarios, Bodega, Compras, Mantenimiento y Carga ('logistica_operaciones')
+    3. Ventas, Atención en Sucursal y Comercial ('ventas_comercial')
+    4. Soporte Técnico, Sistemas e Informática ('soporte_sistemas')
+    5. Programación, Desarrollo de Software y Bases de Datos ('programacion_software')
+    6. Otros ámbitos laborales accesibles fuera de cocina ('general_accesible')
 
     Retorna (es_afin, area_principal).
     """
     texto_completo = _quitar_acentos(f"{titulo} {descripcion}")
     titulo_norm = _quitar_acentos(titulo)
 
-    puntajes: dict[str, int] = {
-        "administrativo_atencion": 0,
-        "logistica_operaciones": 0,
-        "sistemas_software": 0,
-    }
+    puntajes: dict[str, int] = {area: 0 for area in PERFIL_AFINIDAD_CV}
 
     for area, palabras in PERFIL_AFINIDAD_CV.items():
         for palabra in palabras:
             palabra_norm = _quitar_acentos(palabra)
             patron = rf"\b{re.escape(palabra_norm)}\b"
-            # Peso triple si aparece en el título del puesto
             if re.search(patron, titulo_norm):
                 puntajes[area] += 3
             elif descripcion and re.search(patron, texto_completo):
@@ -198,14 +201,75 @@ def evaluar_afinidad_cv(titulo: str, descripcion: str = "") -> tuple[bool, str]:
     if puntajes[mejor_area] > 0:
         return True, mejor_area
 
-    return False, "sin_afinidad"
+    # Si no cayó en ningún sector prohibido (cocina, medicina, gerencia, 4+ años),
+    # se acepta como ámbito laboral general accesible en San Miguel.
+    return True, "general_accesible"
 
 
-def extraer_metadatos_empresa(descripcion_cruda: str) -> dict[str, Any]:
+def generar_consejo_preparacion(
+    titulo: str,
+    descripcion: str = "",
+    area_afinidad: str = "general_accesible",
+) -> str:
+    """
+    Genera una recomendación personalizada de preparación para entrevista.
+    Si detecta una oferta de Programación / Desarrollo de Software o Soporte TI,
+    le indica exactamente qué temas repasar para ir seguro a la entrevista.
+    """
+    texto_norm = _quitar_acentos(f"{titulo} {descripcion}")
+    consejos_especificos: list[str] = []
+
+    for clave, guia in GUIAS_PREPARACION_TECH.items():
+        clave_norm = _quitar_acentos(clave)
+        if re.search(rf"\b{re.escape(clave_norm)}\b", texto_norm):
+            consejos_especificos.append(guia)
+
+    if area_afinidad == "programacion_software":
+        detalle = (
+            " ".join(consejos_especificos[:3])
+            if consejos_especificos
+            else "Repasa lógica de programación, consultas SQL básicas y cómo explicar tus proyectos de ITCA."
+        )
+        return (
+            f"[ALERTA DE PREPARACIÓN SOFTWARE/TI] Tienes 5 años de base técnica (Bachillerato + ITCA), "
+            f"¡sí puedes aplicar! Antes de la entrevista prepárate bien en: {detalle}"
+        )
+
+    if area_afinidad == "soporte_sistemas":
+        detalle = (
+            " ".join(consejos_especificos[:2])
+            if consejos_especificos
+            else "Repasa mantenimiento preventivo, soporte a usuarios, Office y configuración básica de red."
+        )
+        return f"[PREPARACIÓN SOPORTE/TI] Combina tu título de ITCA con tu trato al cliente en clínica. {detalle}"
+
+    if area_afinidad == "administrativo_atencion":
+        return (
+            "Destaca tus más de 2 años en Clínica Cliniciru: cuadre de caja chica sin faltantes, "
+            "facturación, control de agenda y trato amable a clientes."
+        )
+
+    if area_afinidad == "logistica_operaciones":
+        return (
+            "Destaca tu experiencia combinada: auditoría física de inventarios y recepción de proveedores "
+            "en clínica + resistencia física, orden y seguridad ocupacional en mantenimiento y carga."
+        )
+
+    return (
+        "Destaca tu puntualidad, disponibilidad inmediata en San Miguel, experiencia en atención "
+        "al cliente, manejo de inventarios y facilidad para aprender rápido."
+    )
+
+
+def extraer_metadatos_empresa(
+    descripcion_cruda: str,
+    titulo: str = "",
+    area_afinidad: str = "general_accesible",
+) -> dict[str, Any]:
     """
     Extrae toda la información útil de la empresa y de la vacante desde el texto crudo:
-    correos, todos los teléfonos (fijos 2XXX y móviles 6XXX/7XXX), salario ofrecido
-    y un resumen limpio de los primeros párrafos.
+    correos, todos los teléfonos (fijos 2XXX y móviles 6XXX/7XXX), salario ofrecido,
+    resumen de la oferta y guía de preparación para la entrevista.
     """
     contactos = extraer_contactos_oferta(descripcion_cruda)
     salarios = PATRON_SALARIO.findall(descripcion_cruda or "")
@@ -217,6 +281,7 @@ def extraer_metadatos_empresa(descripcion_cruda: str) -> dict[str, Any]:
         if linea.strip()
     ]
     resumen = " | ".join(lineas[:4])[:350] if lineas else ""
+    consejo = generar_consejo_preparacion(titulo, descripcion_cruda, area_afinidad)
 
     return {
         "emails": contactos["emails"],
@@ -224,4 +289,5 @@ def extraer_metadatos_empresa(descripcion_cruda: str) -> dict[str, Any]:
         "whatsapp": contactos["whatsapp"],
         "salario": salario_str,
         "resumen_oferta": resumen,
+        "consejo_preparacion": consejo,
     }

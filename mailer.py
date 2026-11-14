@@ -32,17 +32,31 @@ logger = logging.getLogger(__name__)
 
 RESUMEN_EXPERIENCIA_POR_AREA: dict[str, str] = {
     "administrativo_atencion": (
-        "cuento con experiencia comprobada en asistencia administrativa, atención directa "
-        "al cliente, control de caja chica, facturación y manejo de inventarios"
+        "cuento con más de dos años de experiencia en asistencia administrativa, atención directa "
+        "al cliente, manejo de caja chica, facturación y control físico de inventarios"
     ),
     "logistica_operaciones": (
-        "cuento con experiencia práctica en control físico de inventarios, bodega, recepción "
+        "cuento con experiencia comprobada en control físico de inventarios, bodega, recepción "
         "de pedidos con proveedores y labores operativas de mantenimiento y carga bajo normas de seguridad"
     ),
-    "sistemas_software": (
+    "ventas_comercial": (
+        "cuento con sólida experiencia en atención directa al público, facturación, manejo de "
+        "caja, control de inventario y trato amable orientado al servicio al cliente"
+    ),
+    "soporte_sistemas": (
         "soy egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE), "
-        "con manejo de bases de datos SQL, programación, soporte y herramientas de ofimática, "
-        "además de experiencia administrativa y operativa"
+        "con dominio de herramientas de ofimática, bases de datos y más de dos años de experiencia "
+        "administrativa y de atención al usuario"
+    ),
+    "programacion_software": (
+        "soy egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE), "
+        "con formación en bases de datos SQL, lógica de programación (C#, Java) y experiencia "
+        "en gestión de procesos administrativos y control de inventarios"
+    ),
+    "general_accesible": (
+        "cuento con experiencia combinada en gestión administrativa, atención al cliente, "
+        "control de inventarios y labores operativas de alta exigencia física, con facilidad "
+        "de adaptación y trabajo en equipo"
     ),
 }
 

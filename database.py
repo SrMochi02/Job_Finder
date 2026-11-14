@@ -20,6 +20,7 @@ COLUMNAS_ADICIONALES_VACANTES: dict[str, str] = {
     "correos_empresa": "TEXT DEFAULT ''",
     "telefonos_empresa": "TEXT DEFAULT ''",
     "resumen_oferta": "TEXT DEFAULT ''",
+    "consejo_preparacion": "TEXT DEFAULT ''",
     "llamaron_entrevista": "TEXT DEFAULT 'NO'",
     "notas_entrevista": "TEXT DEFAULT ''",
 }
@@ -65,6 +66,7 @@ def inicializar_bd(db_path: Path = DB_PATH) -> None:
                 correos_empresa TEXT DEFAULT '',
                 telefonos_empresa TEXT DEFAULT '',
                 resumen_oferta TEXT DEFAULT '',
+                consejo_preparacion TEXT DEFAULT '',
                 llamaron_entrevista TEXT DEFAULT 'NO',
                 notas_entrevista TEXT DEFAULT ''
             );
@@ -123,6 +125,7 @@ def guardar_vacante(
     correos_empresa: str = "",
     telefonos_empresa: str = "",
     resumen_oferta: str = "",
+    consejo_preparacion: str = "",
     db_path: Path = DB_PATH,
 ) -> tuple[str, bool]:
     """
@@ -143,8 +146,8 @@ def guardar_vacante(
             INSERT INTO vacantes (
                 id, portal, titulo, empresa, ubicacion, url_original, descripcion_cruda,
                 fecha_deteccion, area_afinidad, salario_ofrecido, correos_empresa,
-                telefonos_empresa, resumen_oferta, llamaron_entrevista, notas_entrevista
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NO', '');
+                telefonos_empresa, resumen_oferta, consejo_preparacion, llamaron_entrevista, notas_entrevista
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NO', '');
             """,
             (
                 vacante_id,
@@ -160,6 +163,7 @@ def guardar_vacante(
                 correos_empresa.strip(),
                 telefonos_empresa.strip(),
                 resumen_oferta.strip(),
+                consejo_preparacion.strip(),
             ),
         )
         conn.commit()
@@ -363,6 +367,7 @@ def obtener_directorio_empresas(db_path: Path = DB_PATH) -> list[dict[str, Any]]
                 v.salario_ofrecido,
                 v.correos_empresa,
                 v.telefonos_empresa,
+                v.consejo_preparacion,
                 v.llamaron_entrevista,
                 v.notas_entrevista,
                 v.url_original,
@@ -399,6 +404,7 @@ def exportar_reporte_empresas_csv(
         "estado_postulaciones",
         "llamaron_entrevista",
         "notas_entrevista",
+        "consejo_preparacion",
         "portal",
         "url_original",
         "resumen_oferta",
