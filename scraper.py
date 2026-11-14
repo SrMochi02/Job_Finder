@@ -146,6 +146,33 @@ def intentar_postular_en_portal(pagina: Page, nombre_portal: str) -> str:
         return "NO"
 
 
+def _lanzar_contexto_persistente(p: Any, directorio: Any, headless: bool = False) -> Any:
+    """
+    Lanza un contexto persistente ocultando las banderas de automatización
+    (--enable-automation y AutomationControlled) para que los portales y Google
+    no bloqueen el inicio de sesión diciendo que el navegador es inseguro.
+    """
+    opciones_comunes = {
+        "user_data_dir": str(directorio),
+        "headless": headless,
+        "viewport": {"width": 1280, "height": 800},
+        "ignore_default_args": ["--enable-automation"],
+        "args": [
+            "--disable-blink-features=AutomationControlled",
+            "--no-default-browser-check",
+        ],
+        "user_agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/131.0.0.0 Safari/537.36"
+        ),
+    }
+    try:
+        return p.chromium.launch_persistent_context(channel="chrome", **opciones_comunes)
+    except Exception:
+        return p.chromium.launch_persistent_context(**opciones_comunes)
+
+
 def iniciar_sesion_portales() -> None:
     """
     Abre el navegador con el perfil persistente (portal_session/) en Computrabajo
@@ -157,15 +184,26 @@ def iniciar_sesion_portales() -> None:
         PORTAL_SESSION_DIR,
     )
     with sync_playwright() as p:
-        contexto = p.chromium.launch_persistent_context(
-            user_data_dir=str(PORTAL_SESSION_DIR),
-            headless=False,
-            viewport={"width": 1280, "height": 800},
-        )
+        try:
+            contexto = _lanzar_contexto_persistente(
+                p, PORTAL_SESSION_DIR, headless=False
+            )
+        except Exception as exc:
+            logger.error(
+                "No se pudo abrir el navegador porque ya tienes otra ventana de Chromium/JobFinder abierta. "
+                "Cierra primero las ventanas abiertas de Chromium e intenta de nuevo. Detalle: %s",
+                exc,
+            )
+            return
+
         pagina = contexto.pages[0] if contexto.pages else contexto.new_page()
+        pagina.add_init_script(
+            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
+        )
         pagina.goto("https://sv.computrabajo.com/", wait_until="domcontentloaded")
         print("\n" + "=" * 80)
         print("1. Inicia sesión con tu cuenta en la ventana de Computrabajo que se acaba de abrir.")
+        print("   (Tip: Puedes entrar con tu correo y contraseña de Computrabajo o con Google).")
         print("2. Cuando ya hayas iniciado sesión y veas tu perfil activo, vuelve aquí y presiona ENTER.")
         print("=" * 80 + "\n")
         try:
@@ -193,17 +231,22 @@ def ejecutar_scraping_todos_los_portales(
     PORTAL_SESSION_DIR.mkdir(parents=True, exist_ok=True)
 
     with sync_playwright() as p:
-        contexto = p.chromium.launch_persistent_context(
-            user_data_dir=str(PORTAL_SESSION_DIR),
-            headless=headless,
-            viewport={"width": 1280, "height": 800},
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/131.0.0.0 Safari/537.36"
-            ),
-        )
+        try:
+            contexto = _lanzar_contexto_persistente(
+                p, PORTAL_SESSION_DIR, headless=headless
+            )
+        except Exception as exc:
+            logger.error(
+                "El navegador persistente ya está abierto en otra ventana. "
+                "Cierra la otra ventana de Chromium primero. Detalle: %s",
+                exc,
+            )
+            return []
+
         pagina = contexto.pages[0] if contexto.pages else contexto.new_page()
+        pagina.add_init_script(
+            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
+        )
 
         try:
             for nombre_portal in lista_portales:
