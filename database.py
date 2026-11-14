@@ -55,16 +55,57 @@ def existe_vacante(
     db_path: Path = DB_PATH,
 ) -> bool:
     """
-    Consulta en 1 milisegundo si la vacante ya existe en SQLite para que el scraper
-    no pierda tiempo volviendo a abrir ofertas ya registradas.
+    Consulta en 1 milisegundo si la vacante ya fue procesada (y postulada en el portal
+    o descartada previamente) para no volver a abrirla.
+    Si la vacante estaba guardada con postulado_en_portal IN ('NO', 'REQUIERE_LOGIN'),
+    retorna False para que el scraper entre a postularla ahora que ya hay sesión activa.
     """
     if not db_path.exists():
         return False
     vacante_id = generar_hash_vacante(titulo=titulo, empresa=empresa, portal=portal)
     with obtener_conexion(db_path) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT 1 FROM vacantes WHERE id = ? LIMIT 1;", (vacante_id,))
-        return cursor.fetchone() is not None
+        cursor.execute(
+            "SELECT postulado_en_portal FROM vacantes WHERE id = ? LIMIT 1;",
+            (vacante_id,),
+        )
+        fila = cursor.fetchone()
+        if fila is None:
+            cursor.execute(
+                "SELECT 1 FROM ofertas_descartadas WHERE id = ? LIMIT 1;",
+                (vacante_id,),
+            )
+            return cursor.fetchone() is not None
+
+        estado_portal = (fila["postulado_en_portal"] or "NO").strip().upper()
+        # Si ya se postuló en el portal ('SI...'), ya no hace falta volver a abrirla
+        return estado_portal.startswith("SI")
+
+
+def registrar_oferta_descartada(
+    titulo: str,
+    empresa: str,
+    portal: str,
+    motivo: str,
+    db_path: Path = DB_PATH,
+) -> None:
+    """
+    Guarda el hash de una oferta que fue descartada tras leer su descripción
+    (ej. porque adentro pedía licencia de conducir o moto propia) para no volver
+    a abrirla nunca más en ciclos futuros.
+    """
+    vacante_id = generar_hash_vacante(titulo=titulo, empresa=empresa, portal=portal)
+    ahora = datetime.now().isoformat(timespec="seconds")
+    with obtener_conexion(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO ofertas_descartadas (id, portal, titulo, empresa, motivo, fecha)
+            VALUES (?, ?, ?, ?, ?, ?);
+            """,
+            (vacante_id, portal.strip(), titulo.strip(), empresa.strip(), motivo.strip(), ahora),
+        )
+        conn.commit()
 
 
 def inicializar_bd(db_path: Path = DB_PATH) -> None:
@@ -133,6 +174,20 @@ def inicializar_bd(db_path: Path = DB_PATH) -> None:
             ON postulaciones(contacto_destino, estado);
             """
         )
+
+        # Tabla de memoria para ofertas descartadas al leer su descripción (ej. exigen licencia/moto)
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ofertas_descartadas (
+                id TEXT PRIMARY KEY,
+                portal TEXT NOT NULL,
+                titulo TEXT NOT NULL,
+                empresa TEXT NOT NULL,
+                motivo TEXT NOT NULL,
+                fecha TEXT NOT NULL
+            );
+            """
+        )
         conn.commit()
 
 
@@ -161,8 +216,35 @@ def guardar_vacante(
 
     with obtener_conexion(db_path) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM vacantes WHERE id = ?;", (vacante_id,))
-        if cursor.fetchone() is not None:
+        cursor.execute(
+            "SELECT id, postulado_en_portal FROM vacantes WHERE id = ?;",
+            (vacante_id,),
+        )
+        existente = cursor.fetchone()
+        if existente is not None:
+            # Si la vacante ya existía pero ahora sí se logró postular en el portal, actualizar su estado
+            if postulado_en_portal.strip().upper().startswith("SI") or (
+                existente["postulado_en_portal"] in ("NO", "REQUIERE_LOGIN")
+                and postulado_en_portal != "NO"
+            ):
+                cursor.execute(
+                    """
+                    UPDATE vacantes
+                    SET postulado_en_portal = ?,
+                        correos_empresa = CASE WHEN ? != '' THEN ? ELSE correos_empresa END,
+                        telefonos_empresa = CASE WHEN ? != '' THEN ? ELSE telefonos_empresa END
+                    WHERE id = ?;
+                    """,
+                    (
+                        postulado_en_portal.strip(),
+                        correos_empresa.strip(),
+                        correos_empresa.strip(),
+                        telefonos_empresa.strip(),
+                        telefonos_empresa.strip(),
+                        vacante_id,
+                    ),
+                )
+                conn.commit()
             return vacante_id, False
 
         cursor.execute(

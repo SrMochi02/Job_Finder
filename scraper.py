@@ -26,7 +26,7 @@ from config import (
     PORTAL_SESSION_DIR,
     UBICACION_OBJETIVO,
 )
-from database import existe_vacante
+from database import existe_vacante, registrar_oferta_descartada
 from parser import es_oferta_excluida
 
 logger = logging.getLogger(__name__)
@@ -64,6 +64,8 @@ PORTALES_CONFIG: dict[str, dict[str, str]] = {
 SELECTORES_BOTON_POSTULAR_COMPUTRABAJO = (
     "a[data-apply-ac], "
     "a.b_primary:has-text('Postularme'), "
+    "button.b_primary:has-text('Postularme'), "
+    "a:has-text('Postularme'), "
     "button:has-text('Postularme'), "
     "span:has-text('Postularme')"
 )
@@ -89,8 +91,6 @@ def extraer_texto_completo_oferta(pagina: Page, selector_detalle: str) -> str:
 
     texto_unido = "\n".join(partes_texto).strip()
 
-    # Si los selectores específicos devolvieron muy poco texto (ej. solo el título),
-    # extraer del body completo filtrando líneas cortas de menú.
     if len(texto_unido) < 120:
         cuerpo = pagina.query_selector("body")
         if cuerpo:
@@ -115,32 +115,44 @@ def intentar_postular_en_portal(pagina: Page, nombre_portal: str) -> str:
         return "NO"
 
     try:
-        contenido_pagina = (pagina.content() or "").lower()
-        if "ya estás postulado" in contenido_pagina or "ya te postulaste" in contenido_pagina:
-            return "SI (Ya postulado)"
-
+        # Verificar si el cartel visible de "Ya aplicaste a esta oferta" está activo en pantalla
+        aviso_ya_aplicado = pagina.query_selector(
+            "div:has-text('Ya aplicaste a esta oferta'), span:has-text('Ya estás postulado')"
+        )
         boton = pagina.query_selector(SELECTORES_BOTON_POSTULAR_COMPUTRABAJO)
+
         if not boton or not boton.is_visible():
+            if aviso_ya_aplicado and aviso_ya_aplicado.is_visible():
+                return "SI (Ya postulado)"
             return "NO"
 
+        boton.scroll_into_view_if_needed(timeout=3000)
         boton.click(timeout=5000)
-        time.sleep(2.0)
+        time.sleep(2.5)
 
         url_actual = pagina.url.lower()
-        contenido_post = (pagina.content() or "").lower()
-
-        if "login" in url_actual or "acceso" in url_actual or "iniciar sesión" in contenido_post:
+        if "login" in url_actual or "acceso" in url_actual or "candidato/login" in url_actual:
             return "REQUIERE_LOGIN"
 
-        if (
-            "postulación enviada" in contenido_post
-            or "ya estás postulado" in contenido_post
-            or "ya te postulaste" in contenido_post
-            or "aplicación enviada" in contenido_post
-        ):
-            return "SI (Auto-postulado)"
+        # Si aparece un segundo botón de confirmación (ej. preguntas rápidas o confirmar envío)
+        boton_confirmar = pagina.query_selector(
+            "button.b_primary:has-text('Enviar'), "
+            "a.b_primary:has-text('Enviar'), "
+            "button:has-text('Postularme'), "
+            "input[type='submit'][value*='Postular']"
+        )
+        if boton_confirmar and boton_confirmar.is_visible():
+            try:
+                boton_confirmar.click(timeout=4000)
+                time.sleep(2.0)
+            except Exception:
+                pass
 
-        return "INTENTADO"
+        url_post = pagina.url.lower()
+        if "login" in url_post or "acceso" in url_post:
+            return "REQUIERE_LOGIN"
+
+        return "SI (Auto-postulado)"
     except Exception as exc:
         logger.debug("No se pudo auto-postular en portal: %s", exc)
         return "NO"
@@ -413,6 +425,12 @@ def ejecutar_scraping_todos_los_portales(
                             nombre_portal,
                             motivo_desc,
                             item["titulo"],
+                        )
+                        registrar_oferta_descartada(
+                            titulo=item["titulo"],
+                            empresa=item["empresa"],
+                            portal=nombre_portal,
+                            motivo=motivo_desc,
                         )
                         continue
 
