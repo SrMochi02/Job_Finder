@@ -33,13 +33,14 @@ HEADLESS_SCRAPER: bool = os.getenv("HEADLESS_SCRAPER", "False").strip().lower() 
     "yes",
 )
 
-# Sectores o palabras clave excluidas (cocina, gastronomía, carreras médicas/legales ajenas al perfil, licencias pesadas)
+# Sectores o palabras clave excluidas (cocina, conducción/licencia, cargos de supervisión/gerencia, carreras médicas/legales)
 _EXCLUIDAS_DEFAULT = (
     "cocina,cocinero,cocinera,chef,mesero,mesera,lavaplatos,restaurante,"
     "pupuseria,panadero,pastelero,barista,parrillero,comida rapida,gastronomia,bartender,steward,"
     "medico,doctor,doctora,enfermera,enfermero,odontologo,farmaceutico,regente,abogado,notario,"
     "contador publico,auditor externo,arquitecto,ingeniero civil,ingeniero agronomo,psicologo,"
-    "motorista pesado,cabezal,licencia pesada,rastre,guardia armado,seguridad privada"
+    "motorista,conductor,chofer,repartidor,rutero,mensajero,motociclista,delivery,"
+    "cabezal,licencia,rastre,guardia armado,seguridad privada,supervisor,coordinador,gerente,jefe"
 )
 PALABRAS_EXCLUIDAS: list[str] = [
     palabra.strip().lower()
@@ -97,8 +98,6 @@ PERFIL_AFINIDAD_CV: dict[str, list[str]] = {
         "kardex",
         "produccion",
         "empaque",
-        "reparto",
-        "mensajero",
     ],
     "ventas_comercial": [
         "ventas",

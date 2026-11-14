@@ -46,6 +46,17 @@ PATRON_EXPERIENCIA_EXCESIVA = re.compile(
     re.IGNORECASE,
 )
 
+# Patrón para descartar ofertas que exijan licencia de conducir, motocicleta o vehículo propio en la descripción
+PATRON_LICENCIA_O_VEHICULO = re.compile(
+    r"\b("
+    r"licencia\s+de\s+conducir|licencia\s+liviana|licencia\s+pesada|licencia\s+de\s+moto|"
+    r"licencia\s+vigente|poseer\s+licencia|con\s+licencia|indispensable\s+licencia|"
+    r"vehiculo\s+propio|moto\s+propia|motocicleta\s+propia|poseer\s+vehiculo|"
+    r"poseer\s+moto(?:cicleta)?|con\s+motocicleta|saber\s+conducir|saber\s+manejar"
+    r")\b",
+    re.IGNORECASE,
+)
+
 # Patrón para detectar salario aproximado en la oferta (ej. $400, $450.00, USD 500)
 PATRON_SALARIO = re.compile(
     r"(?:\$|USD\s*)\s*\d{3,4}(?:[.,]\d{2})?(?:\s*a\s*(?:\$|USD\s*)?\d{3,4}(?:[.,]\d{2})?)?",
@@ -155,15 +166,30 @@ def es_oferta_excluida(
         if re.search(patron, texto_titulo_empresa):
             return True, f"sector/puesto excluido: '{termino.strip()}'"
 
-    # Verificar cargos gerenciales o senior inaccesibles en el título
+    # Verificar cargos gerenciales, supervisión o de ruta en el título
     titulo_norm = _quitar_acentos(titulo)
-    for cargo_inaccesible in ("gerente", "director", "jefe de", "senior", "sr."):
+    for cargo_inaccesible in (
+        "gerente",
+        "director",
+        "jefe",
+        "supervisor",
+        "coordinador",
+        "senior",
+        "sr.",
+        "ventas detalle",
+        "vendedor de ruta",
+        "ventas de ruta",
+    ):
         if re.search(rf"\b{re.escape(cargo_inaccesible)}\b", titulo_norm):
-            return True, f"nivel jerárquico inaccesible: '{cargo_inaccesible}'"
+            return True, f"cargo de supervisión/ruta o nivel inaccesible: '{cargo_inaccesible}'"
 
-    # Si ya tenemos la descripción completa, verificar que no exija 4+ años de experiencia
+    # Si ya tenemos la descripción completa, verificar que no exija licencia/vehículo ni 4+ años de experiencia
     if descripcion:
         desc_norm = _quitar_acentos(descripcion)
+        match_licencia = PATRON_LICENCIA_O_VEHICULO.search(desc_norm)
+        if match_licencia:
+            return True, f"exige licencia de conducir o vehículo ({match_licencia.group(0)})"
+
         match_exp = PATRON_EXPERIENCIA_EXCESIVA.search(desc_norm)
         if match_exp:
             return True, f"exige demasiados años de experiencia ({match_exp.group(0)})"

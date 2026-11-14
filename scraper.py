@@ -192,6 +192,18 @@ def extraer_ofertas_portal(
                     continue
 
                 if descripcion_cruda:
+                    excluida_desc, motivo_desc = es_oferta_excluida(
+                        item["titulo"], item["empresa"], descripcion_cruda
+                    )
+                    if excluida_desc:
+                        logger.info(
+                            "[%s] Oferta descartada al leer descripción (%s): %s",
+                            nombre_portal,
+                            motivo_desc,
+                            item["titulo"],
+                        )
+                        continue
+
                     ofertas_extraidas.append(
                         {
                             **item,
@@ -201,9 +213,18 @@ def extraer_ofertas_portal(
 
                 time.sleep(random.uniform(1.5, 3.5))
 
+        except KeyboardInterrupt:
+            logger.warning(
+                "[%s] Búsqueda interrumpida por el usuario (Ctrl+C). Guardando %d ofertas recolectadas hasta ahora...",
+                nombre_portal,
+                len(ofertas_extraidas),
+            )
         finally:
-            contexto.close()
-            navegador.close()
+            try:
+                contexto.close()
+                navegador.close()
+            except Exception:
+                pass
 
     return ofertas_extraidas
 
