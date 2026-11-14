@@ -215,12 +215,32 @@ def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
             "texto": EDAD_POSTULANTE,
         }
 
-    # 7. Estado civil / Hijos / Familia / Personas que dependen de usted
-    if any(p in q for p in ("estado civil", "casado", "soltero", "acompañado", "hijos", "dependen", "carga familiar", "familia")):
+    # 7. Estado civil y/o Hijos (distinguiendo si pregunta ambos, solo hijos o solo estado civil)
+    pregunta_hijos = any(
+        p in q for p in ("hijo", "hijos", "dependen", "carga familiar", "dependientes")
+    )
+    pregunta_estado_civil = any(
+        p in q for p in ("estado civil", "casado", "soltero", "acompañado", "conyugal")
+    )
+
+    if pregunta_estado_civil and pregunta_hijos:
         return {
             "si_no": "si",
             "numero": "1",
-            "texto": f"{ESTADO_CIVIL_POSTULANTE}, con responsabilidad familiar y total compromiso de estabilidad laboral.",
+            "texto": f"{ESTADO_CIVIL_POSTULANTE} (en unión libre), esperando una hija.",
+        }
+    if pregunta_hijos:
+        return {
+            "si_no": "si",
+            "numero": "1",
+            "texto": "Sí, esperando una hija próximamente.",
+        }
+    if pregunta_estado_civil:
+        es_pregunta_casado_directa = "casado" in q and "estado civil" not in q
+        return {
+            "si_no": "no" if es_pregunta_casado_directa else "si",
+            "numero": "1",
+            "texto": f"{ESTADO_CIVIL_POSTULANTE} (en unión libre).",
         }
 
     # 8. Motivo de salida / retiro de su último empleo
