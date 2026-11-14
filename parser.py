@@ -9,6 +9,7 @@ import unicodedata
 from typing import Any
 
 from config import (
+    EDAD_POSTULANTE,
     GUIAS_PREPARACION_TECH,
     PALABRAS_EXCLUIDAS,
     PERFIL_AFINIDAD_CV,
@@ -54,6 +55,13 @@ PATRON_LICENCIA_O_VEHICULO = re.compile(
     r"vehiculo\s+propio|moto\s+propia|motocicleta\s+propia|poseer\s+vehiculo|"
     r"poseer\s+moto(?:cicleta)?|con\s+motocicleta|saber\s+conducir|saber\s+manejar"
     r")\b",
+    re.IGNORECASE,
+)
+
+# Patrón para detectar edad mínima exigida en la oferta (ej. "Edad entre 25 y 39 años", "Edad: 25 a 35 años", "Mayor de 25 años")
+PATRON_EDAD_MINIMA = re.compile(
+    r"\b(?:edad(?:\s+entre|\s+de)?|mayor(?:es)?\s+de|de)\s*(\d{2})\s*(?:a|y|hasta|-)\s*\d{2}\s*a(?:ñ|n)os\b"
+    r"|\bmayor(?:es)?\s+de\s+(\d{2})\s*a(?:ñ|n)os\b",
     re.IGNORECASE,
 )
 
@@ -193,6 +201,19 @@ def es_oferta_excluida(
         match_exp = PATRON_EXPERIENCIA_EXCESIVA.search(desc_norm)
         if match_exp:
             return True, f"exige demasiados años de experiencia ({match_exp.group(0)})"
+
+        # Verificar si la oferta exige una edad mínima mayor a la edad del postulante
+        edad_usuario_str = re.sub(r"\D", "", EDAD_POSTULANTE)
+        edad_usuario = int(edad_usuario_str) if edad_usuario_str else 21
+        for match_edad in PATRON_EDAD_MINIMA.finditer(desc_norm):
+            edad_min_str = match_edad.group(1) or match_edad.group(2)
+            if edad_min_str:
+                edad_min = int(edad_min_str)
+                if edad_min > edad_usuario and 18 <= edad_min <= 50:
+                    return (
+                        True,
+                        f"exige edad mínima de {edad_min} años ({match_edad.group(0)})",
+                    )
 
     return False, ""
 
