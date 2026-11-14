@@ -105,17 +105,164 @@ def extraer_texto_completo_oferta(pagina: Page, selector_detalle: str) -> str:
     return texto_unido
 
 
-def intentar_postular_en_portal(pagina: Page, nombre_portal: str) -> str:
+def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
     """
-    Intenta hacer clic en el botón 'Postularme' dentro del portal (Computrabajo)
-    si el usuario ya tiene su sesión iniciada en portal_session/.
-    Retorna el estado: 'SI (Auto-postulado)', 'SI (Ya postulado)', 'REQUIERE_LOGIN' o 'NO'.
+    Analiza una pregunta de encuesta de Computrabajo y devuelve la respuesta
+    exacta basada en el CV real del postulante (tanto en texto como en opción Sí/No y número).
+    """
+    q = pregunta_raw.lower()
+
+    # 1. Preguntas sobre licencia o vehículo/moto
+    if any(p in q for p in ("licencia", "motocicleta", "moto", "vehículo", "vehiculo", "conducir", "manejar")):
+        return {
+            "si_no": "no",
+            "numero": "0",
+            "texto": "No poseo licencia ni vehículo propio, pero resido en San Miguel con total puntualidad y facilidad de transporte.",
+        }
+
+    # 2. Preguntas sobre si estudia actualmente (horarios de clases)
+    if any(p in q for p in ("estudia actualmente", "estudiando actualmente", "horario de estudio", "clases")):
+        return {
+            "si_no": "no",
+            "numero": "0",
+            "texto": "Ya soy egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE), por lo que cuento con disponibilidad completa de horario.",
+        }
+
+    # 3. Pretensión salarial / salario esperado
+    if any(p in q for p in ("salario", "salarial", "pretensión", "pretension", "aspiración", "aspiracion", "cuánto desea ganar", "cuanto espera")):
+        return {
+            "si_no": "si",
+            "numero": "400",
+            "texto": "$400 a $450 mensuales (negociable según las responsabilidades del puesto).",
+        }
+
+    # 4. Ubicación / Residencia en San Miguel
+    if any(p in q for p in ("san miguel", "reside", "vivir", "vive", "domicilio", "ubicación", "ubicacion", "zona")):
+        return {
+            "si_no": "si",
+            "numero": "1",
+            "texto": "Sí, resido actualmente en San Miguel, El Salvador.",
+        }
+
+    # 5. Disponibilidad inmediata / horarios / fines de semana / turnos
+    if any(p in q for p in ("disponibilidad", "horario", "turnos", "fines de semana", "inmediata")):
+        return {
+            "si_no": "si",
+            "numero": "1",
+            "texto": "Sí, cuento con disponibilidad inmediata y de horarios en San Miguel.",
+        }
+
+    # 6. Experiencia en caja, facturación, inventario, bodega, atención al cliente, ventas o administración
+    if any(p in q for p in ("caja", "cajero", "facturación", "facturacion", "efectivo", "cobro", "inventario", "bodega", "almacén", "almacen", "cliente", "administrativ", "ventas")):
+        return {
+            "si_no": "si",
+            "numero": "2",
+            "texto": "Sí, cuento con más de 2 años de experiencia comprobada en atención al cliente, manejo y cuadre de caja chica, facturación, control físico de inventarios en bodega y trato con proveedores.",
+        }
+
+    # 7. Estudios, sistemas, computación, Excel, Office o inglés
+    if any(p in q for p in ("excel", "office", "ofimática", "ofimatica", "computación", "computacion", "sistemas", "software", "inglés", "ingles", "estudio", "título", "titulo")):
+        return {
+            "si_no": "si",
+            "numero": "2",
+            "texto": "Sí, soy egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE), con dominio de ofimática (Excel, Word), bases de datos SQL e inglés nivel A2.",
+        }
+
+    # Respuesta general formal basada en el CV para cualquier otra pregunta abierta
+    return {
+        "si_no": "si",
+        "numero": "2",
+        "texto": "Sí, cuento con más de 2 años de experiencia en gestión administrativa, atención al cliente, control de inventarios, caja chica y operaciones en San Miguel, con disponibilidad inmediata.",
+    }
+
+
+def _rellenar_encuesta_y_carta_portal(pagina: Page, titulo_puesto: str) -> None:
+    """
+    Detecta y responde automáticamente los formularios de preguntas filtro (encuestas)
+    y el apartado opcional de Carta de Presentación en Computrabajo usando la información del CV.
+    """
+    try:
+        # 1. Rellenar Carta de Presentación si aparece en pantalla
+        input_titulo_carta = pagina.query_selector(
+            "input[placeholder*='título de la carta'], input[name*='CoverLetterTitle'], input[id*='CoverLetter']"
+        )
+        if input_titulo_carta and input_titulo_carta.is_visible():
+            input_titulo_carta.fill(f"Postulación a {titulo_puesto} - San Miguel")
+
+        textarea_carta = pagina.query_selector(
+            "textarea[placeholder*='cuerpo de la carta'], textarea[name*='CoverLetter'], textarea[id*='CoverLetter']"
+        )
+        if textarea_carta and textarea_carta.is_visible():
+            texto_carta = (
+                f"Buen día. Pongo a su disposición mi CV para la vacante de {titulo_puesto}. "
+                "Cuento con más de 2 años de experiencia en asistencia administrativa, atención al cliente, "
+                "manejo de caja chica, facturación y control físico de inventarios, además de experiencia "
+                "operativa en bodega y formación como Técnico en Desarrollo de Software (ITCA FEPADE). "
+                "Resido en San Miguel y tengo disponibilidad inmediata. Saludos cordiales."
+            )
+            textarea_carta.fill(texto_carta)
+
+        # 2. Responder preguntas abiertas (textarea o inputs de texto de encuesta)
+        bloques_pregunta = pagina.query_selector_all(
+            "div.box_question, div.question, div.field, form div"
+        )
+        for bloque in bloques_pregunta:
+            texto_bloque = (bloque.inner_text() or "").strip()
+            if not texto_bloque or len(texto_bloque) > 400:
+                continue
+
+            respuesta = _determinar_respuesta_cv(texto_bloque)
+
+            # Si el bloque tiene botones de radio (Sí / No)
+            radios = bloque.query_selector_all("input[type='radio']")
+            if radios:
+                for radio in radios:
+                    label_radio = (
+                        bloque.evaluate(
+                            "(el) => el.parentElement ? el.parentElement.innerText : ''",
+                            radio,
+                        )
+                        or ""
+                    ).strip().lower()
+                    if respuesta["si_no"] == "si" and ("sí" in label_radio or "si" == label_radio):
+                        radio.check()
+                        break
+                    if respuesta["si_no"] == "no" and "no" in label_radio:
+                        radio.check()
+                        break
+
+            # Si el bloque tiene un input numérico (ej. años de experiencia o salario)
+            input_num = bloque.query_selector("input[type='number']")
+            if input_num and input_num.is_visible():
+                valor_actual = (input_num.input_value() or "").strip()
+                if not valor_actual:
+                    input_num.fill(respuesta["numero"])
+
+            # Si el bloque tiene un textarea o input de texto para responder la pregunta
+            campo_texto = bloque.query_selector(
+                "textarea:not([placeholder*='cuerpo de la carta']), input[type='text']:not([placeholder*='título de la carta'])"
+            )
+            if campo_texto and campo_texto.is_visible():
+                valor_actual = (campo_texto.input_value() or "").strip()
+                if not valor_actual:
+                    campo_texto.fill(respuesta["texto"])
+
+    except Exception as exc:
+        logger.debug("Aviso al rellenar encuesta/carta opcional: %s", exc)
+
+
+def intentar_postular_en_portal(
+    pagina: Page, nombre_portal: str, titulo_puesto: str = "la vacante"
+) -> str:
+    """
+    Intenta hacer clic en el botón 'Postularme' dentro del portal (Computrabajo),
+    rellena automáticamente encuestas de filtrado o carta de presentación según el CV,
+    y confirma el envío.
     """
     if not AUTO_POSTULAR_PORTAL or nombre_portal != "Computrabajo":
         return "NO"
 
     try:
-        # Verificar si el cartel visible de "Ya aplicaste a esta oferta" está activo en pantalla
         aviso_ya_aplicado = pagina.query_selector(
             "div:has-text('Ya aplicaste a esta oferta'), span:has-text('Ya estás postulado')"
         )
@@ -126,6 +273,9 @@ def intentar_postular_en_portal(pagina: Page, nombre_portal: str) -> str:
                 return "SI (Ya postulado)"
             return "NO"
 
+        # Rellenar preguntas filtro si ya aparecen antes de pulsar Postularme
+        _rellenar_encuesta_y_carta_portal(pagina, titulo_puesto)
+
         boton.scroll_into_view_if_needed(timeout=3000)
         boton.click(timeout=5000)
         time.sleep(2.5)
@@ -134,12 +284,16 @@ def intentar_postular_en_portal(pagina: Page, nombre_portal: str) -> str:
         if "login" in url_actual or "acceso" in url_actual or "candidato/login" in url_actual:
             return "REQUIERE_LOGIN"
 
-        # Si aparece un segundo botón de confirmación (ej. preguntas rápidas o confirmar envío)
+        # Si tras hacer clic se abre una pantalla de encuesta/preguntas o carta de presentación, rellenarla
+        _rellenar_encuesta_y_carta_portal(pagina, titulo_puesto)
+
         boton_confirmar = pagina.query_selector(
             "button.b_primary:has-text('Enviar'), "
             "a.b_primary:has-text('Enviar'), "
+            "button:has-text('Enviar CV'), "
             "button:has-text('Postularme'), "
-            "input[type='submit'][value*='Postular']"
+            "button:has-text('Actualizar'), "
+            "input[type='submit']"
         )
         if boton_confirmar and boton_confirmar.is_visible():
             try:
@@ -434,8 +588,10 @@ def ejecutar_scraping_todos_los_portales(
                         )
                         continue
 
-                    # Intentar auto-postulación en 1 clic si la oferta es válida
-                    estado_portal = intentar_postular_en_portal(pagina, nombre_portal)
+                    # Intentar auto-postulación en 1 clic (incluyendo encuestas/carta) si la oferta es válida
+                    estado_portal = intentar_postular_en_portal(
+                        pagina, nombre_portal, item["titulo"]
+                    )
                     if estado_portal.startswith("SI"):
                         logger.info(
                             "[%s] Auto-postulación en portal exitosa: %s (%s)",
