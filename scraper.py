@@ -21,9 +21,13 @@ from playwright.sync_api import (
 
 from config import (
     AUTO_POSTULAR_PORTAL,
+    DIRECCION_RESIDENCIA,
+    GMAIL_USER,
     HEADLESS_SCRAPER,
     PAGINAS_MAXIMAS,
     PORTAL_SESSION_DIR,
+    PRETENSION_SALARIAL,
+    REMITENTE_TELEFONO,
     UBICACION_OBJETIVO,
 )
 from database import existe_vacante, registrar_oferta_descartada
@@ -107,44 +111,95 @@ def extraer_texto_completo_oferta(pagina: Page, selector_detalle: str) -> str:
 
 def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
     """
-    Analiza una pregunta de encuesta de Computrabajo y devuelve la respuesta
-    exacta basada en el CV real del postulante (tanto en texto como en opción Sí/No y número).
+    Analiza una pregunta de selección de Computrabajo y devuelve la respuesta
+    exacta basada en el CV real del postulante (tanto en texto corto de chat,
+    como en opción Sí/No y número).
     """
     q = pregunta_raw.lower()
 
-    # 1. Preguntas sobre licencia o vehículo/moto
+    # 1. Pretensión salarial / salario esperado (como en la captura: responde '450')
+    if any(
+        p in q
+        for p in (
+            "salario",
+            "salarial",
+            "pretensión",
+            "pretension",
+            "aspiración",
+            "aspiracion",
+            "cuánto desea ganar",
+            "cuanto espera",
+            "sueldo",
+        )
+    ):
+        return {
+            "si_no": "si",
+            "numero": PRETENSION_SALARIAL,
+            "texto": PRETENSION_SALARIAL,
+        }
+
+    # 2. Dirección exacta de residencia / domicilio / ubicación
+    if any(
+        p in q
+        for p in (
+            "dirección",
+            "direccion",
+            "residencia",
+            "domicilio",
+            "dónde vive",
+            "donde vive",
+            "lugar de residencia",
+            "colonia",
+            "municipio",
+        )
+    ):
+        return {
+            "si_no": "si",
+            "numero": "1",
+            "texto": DIRECCION_RESIDENCIA,
+        }
+
+    # 3. ¿Reside en San Miguel? (Pregunta cerrada o de confirmación)
+    if "san miguel" in q or "reside" in q or "vivir" in q:
+        return {
+            "si_no": "si",
+            "numero": "1",
+            "texto": f"Sí, resido en {DIRECCION_RESIDENCIA}.",
+        }
+
+    # 4. Teléfono / WhatsApp / Celular de contacto
+    if any(p in q for p in ("teléfono", "telefono", "celular", "whatsapp", "número de contacto", "numero de contacto")):
+        return {
+            "si_no": "si",
+            "numero": re.sub(r"\D", "", REMITENTE_TELEFONO)[-8:] or "73232022",
+            "texto": REMITENTE_TELEFONO or "San Miguel",
+        }
+
+    # 5. Correo electrónico
+    if any(p in q for p in ("correo", "email", "e-mail")):
+        return {
+            "si_no": "si",
+            "numero": "1",
+            "texto": GMAIL_USER,
+        }
+
+    # 6. Preguntas sobre licencia o vehículo/moto
     if any(p in q for p in ("licencia", "motocicleta", "moto", "vehículo", "vehiculo", "conducir", "manejar")):
         return {
             "si_no": "no",
             "numero": "0",
-            "texto": "No poseo licencia ni vehículo propio, pero resido en San Miguel con total puntualidad y facilidad de transporte.",
+            "texto": "No poseo licencia ni vehículo propio, pero resido en San Miguel con disponibilidad y puntualidad total.",
         }
 
-    # 2. Preguntas sobre si estudia actualmente (horarios de clases)
+    # 7. Preguntas sobre si estudia actualmente (horarios de clases)
     if any(p in q for p in ("estudia actualmente", "estudiando actualmente", "horario de estudio", "clases")):
         return {
             "si_no": "no",
             "numero": "0",
-            "texto": "Ya soy egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE), por lo que cuento con disponibilidad completa de horario.",
+            "texto": "No, ya soy egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE), tengo disponibilidad completa de horario.",
         }
 
-    # 3. Pretensión salarial / salario esperado
-    if any(p in q for p in ("salario", "salarial", "pretensión", "pretension", "aspiración", "aspiracion", "cuánto desea ganar", "cuanto espera")):
-        return {
-            "si_no": "si",
-            "numero": "400",
-            "texto": "$400 a $450 mensuales (negociable según las responsabilidades del puesto).",
-        }
-
-    # 4. Ubicación / Residencia en San Miguel
-    if any(p in q for p in ("san miguel", "reside", "vivir", "vive", "domicilio", "ubicación", "ubicacion", "zona")):
-        return {
-            "si_no": "si",
-            "numero": "1",
-            "texto": "Sí, resido actualmente en San Miguel, El Salvador.",
-        }
-
-    # 5. Disponibilidad inmediata / horarios / fines de semana / turnos
+    # 8. Disponibilidad inmediata / horarios / fines de semana / turnos
     if any(p in q for p in ("disponibilidad", "horario", "turnos", "fines de semana", "inmediata")):
         return {
             "si_no": "si",
@@ -152,37 +207,187 @@ def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
             "texto": "Sí, cuento con disponibilidad inmediata y de horarios en San Miguel.",
         }
 
-    # 6. Experiencia en caja, facturación, inventario, bodega, atención al cliente, ventas o administración
-    if any(p in q for p in ("caja", "cajero", "facturación", "facturacion", "efectivo", "cobro", "inventario", "bodega", "almacén", "almacen", "cliente", "administrativ", "ventas")):
+    # 9. Experiencia en caja, facturación, inventario, bodega, atención al cliente, ventas o administración
+    if any(
+        p in q
+        for p in (
+            "caja",
+            "cajero",
+            "facturación",
+            "facturacion",
+            "efectivo",
+            "cobro",
+            "inventario",
+            "bodega",
+            "almacén",
+            "almacen",
+            "cliente",
+            "administrativ",
+            "ventas",
+            "experiencia",
+            "años",
+        )
+    ):
         return {
             "si_no": "si",
             "numero": "2",
-            "texto": "Sí, cuento con más de 2 años de experiencia comprobada en atención al cliente, manejo y cuadre de caja chica, facturación, control físico de inventarios en bodega y trato con proveedores.",
+            "texto": "Sí, más de 2 años de experiencia en atención al cliente, caja chica, facturación, control de inventarios en bodega y proveedores, más labores operativas de carga y mantenimiento.",
         }
 
-    # 7. Estudios, sistemas, computación, Excel, Office o inglés
-    if any(p in q for p in ("excel", "office", "ofimática", "ofimatica", "computación", "computacion", "sistemas", "software", "inglés", "ingles", "estudio", "título", "titulo")):
+    # 10. Estudios, sistemas, computación, Excel, Office o inglés
+    if any(p in q for p in ("excel", "office", "ofimática", "ofimatica", "computación", "computacion", "sistemas", "software", "inglés", "ingles", "estudio", "título", "titulo", "nivel académico", "nivel academico")):
         return {
             "si_no": "si",
             "numero": "2",
-            "texto": "Sí, soy egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE), con dominio de ofimática (Excel, Word), bases de datos SQL e inglés nivel A2.",
+            "texto": "Egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE), con manejo de Excel/Ofimática, bases de datos SQL e inglés A2.",
         }
 
     # Respuesta general formal basada en el CV para cualquier otra pregunta abierta
     return {
         "si_no": "si",
         "numero": "2",
-        "texto": "Sí, cuento con más de 2 años de experiencia en gestión administrativa, atención al cliente, control de inventarios, caja chica y operaciones en San Miguel, con disponibilidad inmediata.",
+        "texto": "Sí, cuento con más de 2 años de experiencia administrativa, de inventarios, caja y atención al cliente en San Miguel, con disponibilidad inmediata.",
     }
+
+
+def _resolver_chat_preguntas_seleccion(pagina: Page) -> bool:
+    """
+    Resuelve paso a paso el chat interactivo de 'Preguntas de selección' de Computrabajo
+    ('Ya casi estamos, pero antes contesta estas preguntas' -> 'Escribe tu respuesta aquí').
+    Retorna True si detectó y respondió preguntas del chat.
+    """
+    respondio_alguna = False
+    ultima_pregunta_vista = ""
+
+    for _ in range(12):
+        time.sleep(1.5)
+
+        # Buscar el cuadro de chat inferior: "Escribe tu respuesta aquí"
+        caja_chat = pagina.query_selector(
+            "input[placeholder*='Escribe tu respuesta'], "
+            "textarea[placeholder*='Escribe tu respuesta'], "
+            "input[placeholder*='respuesta aquí'], "
+            "textarea[placeholder*='respuesta aquí']"
+        )
+
+        # Extraer la última pregunta visible en el panel de "Preguntas de selección"
+        textos_preguntas = pagina.evaluate(
+            """() => {
+                const candidatos = Array.from(document.querySelectorAll('p, h3, h4, strong, b, div, span'));
+                const preguntas = [];
+                for (const el of candidatos) {
+                    if (el.children.length > 2) continue;
+                    const txt = (el.innerText || '').trim();
+                    if (
+                        txt.length > 10 &&
+                        txt.length < 220 &&
+                        (txt.endsWith(':') || txt.endsWith('?') || txt.includes('¿') ||
+                         txt.toLowerCase().includes('indique') ||
+                         txt.toLowerCase().includes('coloque') ||
+                         txt.toLowerCase().includes('cuál') ||
+                         txt.toLowerCase().includes('cual') ||
+                         txt.toLowerCase().includes('posee') ||
+                         txt.toLowerCase().includes('tiene') ||
+                         txt.toLowerCase().includes('cuenta con') ||
+                         txt.toLowerCase().includes('experiencia') ||
+                         txt.toLowerCase().includes('pretensión') ||
+                         txt.toLowerCase().includes('dirección'))
+                    ) {
+                        preguntas.push(txt);
+                    }
+                }
+                return preguntas;
+            }"""
+        )
+
+        pregunta_actual = textos_preguntas[-1] if textos_preguntas else ""
+
+        if caja_chat and caja_chat.is_visible() and not caja_chat.is_disabled():
+            if pregunta_actual and pregunta_actual == ultima_pregunta_vista:
+                # Si la pregunta no cambió tras Enter, intentar clic en el botón de flecha al lado del input
+                boton_flecha = pagina.query_selector(
+                    "button:near(input[placeholder*='Escribe tu respuesta']), "
+                    "button:near(textarea[placeholder*='Escribe tu respuesta']), "
+                    "span[data-icon*='send'], button[type='submit']"
+                )
+                if boton_flecha and boton_flecha.is_visible():
+                    try:
+                        boton_flecha.click(timeout=2500)
+                        time.sleep(1.5)
+                        continue
+                    except Exception:
+                        break
+                break
+
+            ultima_pregunta_vista = pregunta_actual
+            r = _determinar_respuesta_cv(pregunta_actual)
+            logger.info(
+                "[Computrabajo Encuesta] Pregunta: '%s' -> Respuesta: '%s'",
+                pregunta_actual,
+                r["texto"],
+            )
+
+            caja_chat.click()
+            caja_chat.fill(r["texto"])
+            time.sleep(0.5)
+            caja_chat.press("Enter")
+            time.sleep(1.0)
+
+            # Si el texto sigue en el input tras presionar Enter, hacer clic en el botón de flecha (enviar)
+            try:
+                valor_restante = (caja_chat.input_value() or "").strip()
+                if valor_restante:
+                    pagina.evaluate(
+                        """(inputEl) => {
+                            const parent = inputEl.closest('form') || inputEl.parentElement.parentElement;
+                            if (parent) {
+                                const btn = parent.querySelector('button, [role="button"], svg, a');
+                                if (btn) btn.click();
+                            }
+                        }""",
+                        caja_chat,
+                    )
+            except Exception:
+                pass
+
+            respondio_alguna = True
+            continue
+
+        # Si en lugar de caja de texto aparecen botones de opción rápida (ej. Sí / No en el chat)
+        if pregunta_actual and pregunta_actual != ultima_pregunta_vista:
+            r = _determinar_respuesta_cv(pregunta_actual)
+            selector_opcion = (
+                "button:has-text('Sí'), label:has-text('Sí')"
+                if r["si_no"] == "si"
+                else "button:has-text('No'), label:has-text('No')"
+            )
+            boton_op = pagina.query_selector(selector_opcion)
+            if boton_op and boton_op.is_visible():
+                ultima_pregunta_vista = pregunta_actual
+                logger.info(
+                    "[Computrabajo Encuesta] Pregunta opción: '%s' -> '%s'",
+                    pregunta_actual,
+                    r["si_no"].upper(),
+                )
+                boton_op.click()
+                respondio_alguna = True
+                continue
+
+        break
+
+    return respondio_alguna
 
 
 def _rellenar_encuesta_y_carta_portal(pagina: Page, titulo_puesto: str) -> None:
     """
-    Detecta y responde automáticamente los formularios de preguntas filtro (encuestas)
-    y el apartado opcional de Carta de Presentación en Computrabajo usando la información del CV.
+    Detecta y responde tanto el chat interactivo de 'Preguntas de selección'
+    ('Escribe tu respuesta aquí') como formularios tradicionales y Carta de Presentación.
     """
     try:
-        # 1. Rellenar Carta de Presentación si aparece en pantalla
+        # 1. Resolver primero el chat interactivo paso a paso ("Preguntas de selección")
+        _resolver_chat_preguntas_seleccion(pagina)
+
+        # 2. Rellenar Carta de Presentación si aparece en pantalla
         input_titulo_carta = pagina.query_selector(
             "input[placeholder*='título de la carta'], input[name*='CoverLetterTitle'], input[id*='CoverLetter']"
         )

@@ -16,6 +16,8 @@ GMAIL_USER: str = os.getenv("GMAIL_USER", "")
 GMAIL_APP_PASSWORD: str = os.getenv("GMAIL_APP_PASSWORD", "")
 REMITENTE_NOMBRE: str = os.getenv("REMITENTE_NOMBRE", "Candidato")
 REMITENTE_TELEFONO: str = os.getenv("REMITENTE_TELEFONO", "")
+DIRECCION_RESIDENCIA: str = os.getenv("DIRECCION_RESIDENCIA", "San Miguel, El Salvador")
+PRETENSION_SALARIAL: str = os.getenv("PRETENSION_SALARIAL", "450")
 
 # Rutas de archivos y directorios
 CV_PATH: Path = Path(os.getenv("CV_PATH", str(BASE_DIR / "cv_postulante.pdf"))).resolve()
