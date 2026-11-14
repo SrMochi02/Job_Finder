@@ -43,7 +43,7 @@ AUTO_POSTULAR_PORTAL: bool = os.getenv("AUTO_POSTULAR_PORTAL", "True").strip().l
 
 # Parámetros de scraping
 UBICACION_OBJETIVO: str = os.getenv("UBICACION_OBJETIVO", "San Miguel")
-PAGINAS_MAXIMAS: int = int(os.getenv("PAGINAS_MAXIMAS", "3"))
+PAGINAS_MAXIMAS: int = int(os.getenv("PAGINAS_MAXIMAS", "8"))
 HEADLESS_SCRAPER: bool = os.getenv("HEADLESS_SCRAPER", "False").strip().lower() in (
     "true",
     "1",
