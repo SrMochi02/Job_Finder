@@ -174,14 +174,22 @@ def es_oferta_excluida(
         if re.search(patron, texto_titulo_empresa):
             return True, f"sector/puesto excluido: '{termino.strip()}'"
 
-    # Verificar cargos gerenciales, supervisión o de ruta en el título
+    # Verificar cargos gerenciales, supervisión, ruta o rubros ajenos en el título
     titulo_norm = _quitar_acentos(titulo)
     for cargo_inaccesible in (
         "gerente",
         "director",
         "jefe",
+        "jefa",
         "supervisor",
+        "supervisora",
         "coordinador",
+        "coordinadora",
+        "encargado de tienda",
+        "encargada de tienda",
+        "lider de tienda",
+        "administrador de tienda",
+        "administradora de tienda",
         "senior",
         "sr.",
         "ventas detalle",
@@ -193,9 +201,29 @@ def es_oferta_excluida(
         "ingeniero civil",
         "arquitecto",
         "arquitectura",
+        "lavador",
+        "volanteo",
+        "little caesars",
+        "refrigeracion",
+        "aire acondicionado",
+        "vigilante",
     ):
         if re.search(rf"\b{re.escape(cargo_inaccesible)}\b", titulo_norm):
-            return True, f"cargo de supervisión/ruta o nivel inaccesible: '{cargo_inaccesible}'"
+            return True, f"cargo o rubro excluido: '{cargo_inaccesible}'"
+
+    # Verificar que el TÍTULO del puesto pertenezca explícitamente a al menos una de las 5 áreas del CV
+    coincide_titulo_cv = False
+    for _area, palabras_area in PERFIL_AFINIDAD_CV.items():
+        for palabra in palabras_area:
+            palabra_norm = _quitar_acentos(palabra)
+            if re.search(rf"\b{re.escape(palabra_norm)}\b", titulo_norm):
+                coincide_titulo_cv = True
+                break
+        if coincide_titulo_cv:
+            break
+
+    if not coincide_titulo_cv:
+        return True, "el título del puesto no pertenece a tus áreas (Administración, Bodega/Logística, Atención/Caja/Ventas en local o Informática)"
 
     # Si ya tenemos la descripción completa, verificar que no exija licencia/vehículo ni 4+ años de experiencia
     if descripcion:
@@ -254,9 +282,8 @@ def evaluar_afinidad_cv(titulo: str, descripcion: str = "") -> tuple[bool, str]:
     if puntajes[mejor_area] > 0:
         return True, mejor_area
 
-    # Si no cayó en ningún sector prohibido (cocina, medicina, gerencia, 4+ años),
-    # se acepta como ámbito laboral general accesible en San Miguel.
-    return True, "general_accesible"
+    # Si no coincidió ninguna palabra clave de las 5 áreas del CV, se descarta.
+    return False, "sin_afinidad"
 
 
 def generar_consejo_preparacion(

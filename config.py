@@ -50,16 +50,17 @@ HEADLESS_SCRAPER: bool = os.getenv("HEADLESS_SCRAPER", "False").strip().lower() 
     "yes",
 )
 
-# Sectores o palabras clave excluidas (cocina, conducción/licencia, cargos de supervisión/gerencia, carreras médicas/docencia/mecánica/campo/limpieza)
+# Sectores o palabras clave excluidas (cocina, conducción/licencia, cargos de supervisión/gerencia, carreras médicas/docencia/mecánica/campo/limpieza/volanteo)
 _EXCLUIDAS_DEFAULT = (
-    "cocina,cocinero,cocinera,chef,mesero,mesera,lavaplatos,restaurante,"
+    "cocina,cocinero,cocinera,chef,mesero,mesera,lavaplatos,restaurante,pizzeria,little caesars,pizza hut,wendys,pollo campero,burger king,mcdonalds,kfc,"
     "pupuseria,panadero,pastelero,barista,parrillero,comida rapida,gastronomia,bartender,steward,"
     "medico,doctor,doctora,enfermera,enfermero,odontologo,farmaceutico,farmacia,regente,abogado,notario,"
     "contador publico,auditor externo,arquitecto,arquitectura,arq,ingeniero civil,ing civil,ingeniero agronomo,ing agronomo,ingeniero industrial,ing industrial,ingeniero electrico,ing electrico,ingeniero mecanico,psicologo,psicologa,"
     "profesor,profesora,docente,maestro,maestra,mecanico,automotriz,perito,topografo,"
-    "tecnico en limpieza,ordenanza,conserje,impulsadora,vendedor de campo,trabajo de campo,gestor de campo,cambaceo,"
+    "tecnico en limpieza,limpieza,ordenanza,conserje,lavador,carwash,autolavado,lavado de vehiculos,volanteo,volantero,edecan,impulsadora,display,mercaderista de ruta,vendedor de campo,trabajo de campo,gestor de campo,cambaceo,"
+    "refrigeracion,aire acondicionado,electricista,soldador,albañil,albanil,fontanero,plomero,carpintero,instalador,costurera,sastre,estilista,barbero,peluquero,"
     "motorista,conductor,chofer,repartidor,rutero,mensajero,motociclista,delivery,"
-    "cabezal,licencia,rastre,guardia armado,seguridad privada,supervisor,coordinador,gerente,jefe"
+    "cabezal,licencia,rastre,guardia armado,seguridad privada,vigilante,supervisor,supervisora,coordinador,coordinadora,gerente,jefe,jefa,encargada de tienda,encargado de tienda,lider de tienda,administradora de tienda"
 )
 PALABRAS_EXCLUIDAS: list[str] = [
     palabra.strip().lower()
@@ -82,7 +83,10 @@ PERFIL_AFINIDAD_CV: dict[str, list[str]] = {
         "cajero",
         "cajera",
         "facturacion",
+        "facturador",
+        "facturadora",
         "digitador",
+        "digitadora",
         "oficina",
         "ofimatica",
         "agenda",
@@ -98,6 +102,7 @@ PERFIL_AFINIDAD_CV: dict[str, list[str]] = {
         "inventario",
         "bodega",
         "bodeguero",
+        "auxiliar de bodega",
         "almacen",
         "logistica",
         "compras",
@@ -105,31 +110,25 @@ PERFIL_AFINIDAD_CV: dict[str, list[str]] = {
         "encomiendas",
         "proveedores",
         "despacho",
-        "mantenimiento",
+        "auxiliar de despacho",
         "carga",
         "descarga",
-        "auxiliar",
-        "operativo",
-        "operaciones",
-        "planta",
-        "orden",
+        "auxiliar de mantenimiento",
+        "operador de bodega",
         "suministros",
         "kardex",
-        "produccion",
         "empaque",
     ],
     "ventas_comercial": [
         "ventas",
         "vendedor",
-        "asesor",
-        "ejecutivo",
-        "comercial",
-        "promotor",
-        "impulsador",
+        "asesor de ventas",
+        "ejecutivo de venta",
+        "ejecutivo de ventas",
+        "dependiente",
+        "atencion en sala",
         "mostrador",
-        "tienda",
-        "sucursal",
-        "agencia",
+        "cajero",
     ],
     "soporte_sistemas": [
         "soporte tecnico",
