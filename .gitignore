@@ -16,9 +16,12 @@ portal_session/
 playwright_profile/
 browser_data/
 
-# Archivos personales / CV y reportes locales
+# Archivos personales / CV, fotos y reportes locales
 *.pdf
 *.csv
+*.png
+*.jpg
+*.jpeg
 
 # Caché de Python
 __pycache__/
