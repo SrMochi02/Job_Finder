@@ -33,12 +33,13 @@ HEADLESS_SCRAPER: bool = os.getenv("HEADLESS_SCRAPER", "False").strip().lower() 
     "yes",
 )
 
-# Sectores o palabras clave excluidas (cocina, conducción/licencia, cargos de supervisión/gerencia, carreras médicas/legales)
+# Sectores o palabras clave excluidas (cocina, conducción/licencia, cargos de supervisión/gerencia, carreras médicas/docencia/mecánica)
 _EXCLUIDAS_DEFAULT = (
     "cocina,cocinero,cocinera,chef,mesero,mesera,lavaplatos,restaurante,"
     "pupuseria,panadero,pastelero,barista,parrillero,comida rapida,gastronomia,bartender,steward,"
-    "medico,doctor,doctora,enfermera,enfermero,odontologo,farmaceutico,regente,abogado,notario,"
+    "medico,doctor,doctora,enfermera,enfermero,odontologo,farmaceutico,farmacia,regente,abogado,notario,"
     "contador publico,auditor externo,arquitecto,ingeniero civil,ingeniero agronomo,psicologo,"
+    "profesor,profesora,docente,maestro,maestra,mecanico,automotriz,perito,"
     "motorista,conductor,chofer,repartidor,rutero,mensajero,motociclista,delivery,"
     "cabezal,licencia,rastre,guardia armado,seguridad privada,supervisor,coordinador,gerente,jefe"
 )
@@ -113,12 +114,14 @@ PERFIL_AFINIDAD_CV: dict[str, list[str]] = {
         "agencia",
     ],
     "soporte_sistemas": [
-        "soporte",
         "soporte tecnico",
+        "tecnico en sistemas",
+        "tecnico en informatica",
+        "tecnico en computacion",
+        "auxiliar de sistemas",
         "sistemas",
         "informatica",
         "computacion",
-        "tecnico",
         "tecnologia",
         "it",
         "ti",

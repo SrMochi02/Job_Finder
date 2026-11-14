@@ -7,12 +7,14 @@ de la empresa reclutadora, el área de afinidad con el CV y el seguimiento de en
 
 import csv
 import hashlib
+import re
 import sqlite3
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-from config import BASE_DIR, DB_PATH
+from config import BASE_DIR, DB_PATH, UBICACION_OBJETIVO
+from parser import es_oferta_excluida
 
 COLUMNAS_ADICIONALES_VACANTES: dict[str, str] = {
     "area_afinidad": "TEXT DEFAULT 'general'",
@@ -416,3 +418,65 @@ def exportar_reporte_empresas_csv(
             writer.writerow(fila)
 
     return ruta_csv
+
+
+def depurar_vacantes_existentes(db_path: Path = DB_PATH) -> int:
+    """
+    Limpia la base de datos existente eliminando ofertas que ahora estén en la lista de
+    exclusión (ej. Doctor, Profesora, Perito, Mecánico) y corrigiendo saltos de línea
+    en nombres de empresa y salarios para que el CSV en Excel se vea impecable.
+    """
+    eliminadas = 0
+    with obtener_conexion(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, titulo, empresa, ubicacion, salario_ofrecido, descripcion_cruda FROM vacantes;"
+        )
+        filas = cursor.fetchall()
+
+        for fila in filas:
+            vid = fila["id"]
+            titulo = fila["titulo"] or ""
+            empresa = fila["empresa"] or ""
+            ubicacion = fila["ubicacion"] or ""
+            salario = fila["salario_ofrecido"] or ""
+            desc = fila["descripcion_cruda"] or ""
+
+            excluida, _ = es_oferta_excluida(titulo, empresa, desc)
+            if excluida:
+                cursor.execute("DELETE FROM vacantes WHERE id = ?;", (vid,))
+                eliminadas += 1
+                continue
+
+            empresa_limpia = (
+                re.sub(r"^\d+(?:[.,]\d+)?\s*", "", empresa).replace("\n", " ").strip()
+                or "Empresa Confidencial"
+            )
+            ubicacion_limpia = (
+                UBICACION_OBJETIVO
+                if re.fullmatch(r"\d+(?:[.,]\d+)?", ubicacion.strip())
+                else ubicacion.replace("\n", " ").strip()
+            )
+            salario_limpio = (
+                re.sub(r"\s+", "", salario.strip())
+                if salario and salario != "No especificado"
+                else "No especificado"
+            )
+
+            if (
+                empresa_limpia != empresa
+                or ubicacion_limpia != ubicacion
+                or salario_limpio != salario
+            ):
+                cursor.execute(
+                    """
+                    UPDATE vacantes
+                    SET empresa = ?, ubicacion = ?, salario_ofrecido = ?
+                    WHERE id = ?;
+                    """,
+                    (empresa_limpia, ubicacion_limpia, salario_limpio, vid),
+                )
+
+        conn.commit()
+    return eliminadas
+

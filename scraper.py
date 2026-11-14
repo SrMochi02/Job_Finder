@@ -6,6 +6,7 @@ y extrae título, empresa, ubicación, URL original y descripción completa.
 
 import logging
 import random
+import re
 import time
 from typing import Any
 from urllib.parse import urljoin
@@ -26,7 +27,7 @@ PORTALES_CONFIG: dict[str, dict[str, str]] = {
         "selector_titulo_enlace": "h2 a.js-o-link, a.js-o-link",
         "selector_empresa": "p.dFlex a.fc_base, p.fs16.fc_base",
         "selector_ubicacion": "p.fs16.fc_base span.mr10",
-        "selector_descripcion_detalle": "div[div-link='oferta'], div.box_detail, p.mbB",
+        "selector_descripcion_detalle": "div.box_detail, div[field='description'], div.bWord, p.mbB, main",
     },
     "Tecoloco": {
         "base_url": "https://www.tecoloco.com.sv",
@@ -117,17 +118,26 @@ def extraer_ofertas_portal(
                     urls_vistas.add(url_completa)
 
                     nodo_empresa = tarjeta.query_selector(cfg["selector_empresa"])
-                    empresa = (
+                    empresa_cruda = (
                         nodo_empresa.inner_text().strip()
                         if nodo_empresa
                         else "Empresa Confidencial"
                     )
+                    # Limpiar calificaciones numéricas iniciales (ej. "4.3 \nHELADOS SARITA") y saltos de línea
+                    empresa = re.sub(
+                        r"^\d+(?:[.,]\d+)?\s*", "", empresa_cruda
+                    ).replace("\n", " ").strip() or "Empresa Confidencial"
 
                     nodo_ubicacion = tarjeta.query_selector(cfg["selector_ubicacion"])
-                    ubicacion = (
+                    ubicacion_cruda = (
                         nodo_ubicacion.inner_text().strip()
                         if nodo_ubicacion
                         else UBICACION_OBJETIVO
+                    )
+                    ubicacion = (
+                        UBICACION_OBJETIVO
+                        if re.fullmatch(r"\d+(?:[.,]\d+)?", ubicacion_cruda)
+                        else ubicacion_cruda.replace("\n", " ").strip()
                     )
 
                     excluida, motivo_exclusion = es_oferta_excluida(titulo, empresa)

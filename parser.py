@@ -299,14 +299,18 @@ def extraer_metadatos_empresa(
     """
     contactos = extraer_contactos_oferta(descripcion_cruda)
     salarios = PATRON_SALARIO.findall(descripcion_cruda or "")
-    salario_str = salarios[0].strip() if salarios else "No especificado"
+    if salarios:
+        salario_str = re.sub(r"\s+", "", salarios[0].strip())
+    else:
+        salario_str = "No especificado"
 
+    lineas_ignoradas = {"volver al listado", "oferta", "postularme", "compartir"}
     lineas = [
         linea.strip()
         for linea in (descripcion_cruda or "").splitlines()
-        if linea.strip()
+        if linea.strip() and linea.strip().lower() not in lineas_ignoradas
     ]
-    resumen = " | ".join(lineas[:4])[:350] if lineas else ""
+    resumen = " | ".join(lineas[:6])[:380] if lineas else ""
     consejo = generar_consejo_preparacion(titulo, descripcion_cruda, area_afinidad)
 
     return {

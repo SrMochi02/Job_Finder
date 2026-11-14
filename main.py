@@ -19,6 +19,7 @@ from config import (
 )
 from database import (
     contar_envios_hoy,
+    depurar_vacantes_existentes,
     exportar_reporte_empresas_csv,
     guardar_vacante,
     inicializar_bd,
@@ -166,6 +167,9 @@ def procesar_ofertas_extraidas(ofertas: list[dict[str, Any]]) -> dict[str, int]:
 def mostrar_resumen_empresas() -> None:
     """Muestra en consola el listado de empresas, contactos y seguimiento de entrevistas."""
     inicializar_bd()
+    depuradas = depurar_vacantes_existentes()
+    if depuradas:
+        logger.info("Se depuraron %d vacantes excluidas de la base de datos.", depuradas)
     empresas = obtener_directorio_empresas()
     ruta_csv = exportar_reporte_empresas_csv()
 
@@ -206,6 +210,7 @@ def ejecutar_flujo_completo(
     """Ejecuta un ciclo del flujo lineal de Job Finder."""
     logger.info("=== INICIANDO CICLO DE AUTOMATIZACIÓN JOB FINDER (SAN MIGUEL) ===")
     inicializar_bd()
+    depurar_vacantes_existentes()
 
     if modo_demo:
         logger.info("Ejecutando en modo DEMO con ofertas de prueba en San Miguel...")
