@@ -203,7 +203,12 @@ def es_oferta_excluida(
         "arquitectura",
         "lavador",
         "volanteo",
-        "little caesars",
+        "pollo campero",
+        "campero",
+        "pollo campestre",
+        "campestre",
+        "asador",
+        "parrillero",
         "refrigeracion",
         "aire acondicionado",
         "vigilante",
@@ -211,12 +216,12 @@ def es_oferta_excluida(
         if re.search(rf"\b{re.escape(cargo_inaccesible)}\b", titulo_norm):
             return True, f"cargo o rubro excluido: '{cargo_inaccesible}'"
 
-    # Verificar que el TÍTULO del puesto pertenezca explícitamente a al menos una de las 5 áreas del CV
+    # Verificar que el TÍTULO o EMPRESA pertenezca explícitamente a al menos una de las 5 áreas del CV o franquicias permitidas
     coincide_titulo_cv = False
     for _area, palabras_area in PERFIL_AFINIDAD_CV.items():
         for palabra in palabras_area:
             palabra_norm = _quitar_acentos(palabra)
-            if re.search(rf"\b{re.escape(palabra_norm)}\b", titulo_norm):
+            if re.search(rf"\b{re.escape(palabra_norm)}\b", texto_titulo_empresa):
                 coincide_titulo_cv = True
                 break
         if coincide_titulo_cv:

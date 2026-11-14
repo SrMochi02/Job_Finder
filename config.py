@@ -50,10 +50,10 @@ HEADLESS_SCRAPER: bool = os.getenv("HEADLESS_SCRAPER", "False").strip().lower() 
     "yes",
 )
 
-# Sectores o palabras clave excluidas (cocina, conducción/licencia, cargos de supervisión/gerencia, carreras médicas/docencia/mecánica/campo/limpieza/volanteo)
+# Sectores o palabras clave excluidas (cocina pesada/asadores, Pollo Campero/Campestre, conducción/licencia, cargos de supervisión/gerencia, carreras médicas/docencia/mecánica/campo/limpieza)
 _EXCLUIDAS_DEFAULT = (
-    "cocina,cocinero,cocinera,chef,mesero,mesera,lavaplatos,restaurante,pizzeria,little caesars,pizza hut,wendys,pollo campero,burger king,mcdonalds,kfc,"
-    "pupuseria,panadero,pastelero,barista,parrillero,comida rapida,gastronomia,bartender,steward,"
+    "cocinero,cocinera,chef,lavaplatos,asador,parrillero,pupuseria,panadero,pastelero,bartender,steward,"
+    "pollo campero,campero,pollo campestre,campestre,"
     "medico,doctor,doctora,enfermera,enfermero,odontologo,farmaceutico,farmacia,regente,abogado,notario,"
     "contador publico,auditor externo,arquitecto,arquitectura,arq,ingeniero civil,ing civil,ingeniero agronomo,ing agronomo,ingeniero industrial,ing industrial,ingeniero electrico,ing electrico,ingeniero mecanico,psicologo,psicologa,"
     "profesor,profesora,docente,maestro,maestra,mecanico,automotriz,perito,topografo,"
@@ -129,6 +129,17 @@ PERFIL_AFINIDAD_CV: dict[str, list[str]] = {
         "atencion en sala",
         "mostrador",
         "cajero",
+        "little caesar",
+        "little caesars",
+        "pizza hut",
+        "wendys",
+        "wendy's",
+        "burger king",
+        "burguer king",
+        "kfc",
+        "asociado de restaurante",
+        "equipo de restaurante",
+        "atencion en restaurante",
     ],
     "soporte_sistemas": [
         "soporte tecnico",
