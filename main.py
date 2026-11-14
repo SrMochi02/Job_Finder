@@ -34,7 +34,7 @@ from parser import (
     evaluar_afinidad_cv,
     extraer_metadatos_empresa,
 )
-from scraper import ejecutar_scraping_todos_los_portales
+from scraper import ejecutar_scraping_todos_los_portales, iniciar_sesion_portales
 from whatsapp import procesar_cola_whatsapp
 
 logging.basicConfig(
@@ -120,6 +120,7 @@ def procesar_ofertas_extraidas(ofertas: list[dict[str, Any]]) -> dict[str, int]:
             telefonos_empresa=telefonos_str,
             resumen_oferta=info_empresa["resumen_oferta"],
             consejo_preparacion=consejo_prep,
+            postulado_en_portal=oferta.get("postulado_en_portal", "NO"),
         )
 
         if es_nueva and area_afinidad in ("programacion_software", "soporte_sistemas"):
@@ -361,6 +362,11 @@ def parsear_argumentos() -> argparse.Namespace:
         help="Notas adicionales al marcar una entrevista (ej. fecha, hora o nombre del reclutador).",
     )
     parser.add_argument(
+        "--login-portales",
+        action="store_true",
+        help="Abre el navegador persistente para iniciar sesión una vez en Computrabajo y habilitar la auto-postulación.",
+    )
+    parser.add_argument(
         "--demo",
         action="store_true",
         help="Prueba el filtro de CV y guardado de empresas con datos simulados sin enviar mensajes.",
@@ -371,7 +377,9 @@ def parsear_argumentos() -> argparse.Namespace:
 if __name__ == "__main__":
     args = parsear_argumentos()
 
-    if args.empresas:
+    if args.login_portales:
+        iniciar_sesion_portales()
+    elif args.empresas:
         mostrar_resumen_empresas()
     elif args.marcar_entrevista:
         inicializar_bd()

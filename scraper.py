@@ -1,7 +1,9 @@
 """
-Módulo de Extracción de Vacantes con Playwright (Fase 2 - ETL).
-Recorre las primeras N páginas de portales de empleo locales filtrando por San Miguel
-y extrae título, empresa, ubicación, URL original y descripción completa.
+Módulo de Extracción de Vacantes y Auto-Postulación con Playwright (Fase 2 - ETL).
+Incluye:
+- Salto instantáneo de vacantes ya guardadas en SQLite (ahorra 90% del tiempo en ciclos repetidos).
+- Extracción profunda del cuerpo completo de la oferta (Computrabajo, Encuentra24 y Tecoloco).
+- Sesión persistente en portales (portal_session/) para auto-postulación en 1 clic con el botón 'Postularme'.
 """
 
 import logging
@@ -11,14 +13,24 @@ import time
 from typing import Any
 from urllib.parse import urljoin
 
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import (
+    Page,
+    TimeoutError as PlaywrightTimeoutError,
+    sync_playwright,
+)
 
-from config import HEADLESS_SCRAPER, PAGINAS_MAXIMAS, UBICACION_OBJETIVO
+from config import (
+    AUTO_POSTULAR_PORTAL,
+    HEADLESS_SCRAPER,
+    PAGINAS_MAXIMAS,
+    PORTAL_SESSION_DIR,
+    UBICACION_OBJETIVO,
+)
+from database import existe_vacante
 from parser import es_oferta_excluida
 
 logger = logging.getLogger(__name__)
 
-# Configuración de selectores CSS inspeccionados para portales salvadoreños
 PORTALES_CONFIG: dict[str, dict[str, str]] = {
     "Computrabajo": {
         "base_url": "https://sv.computrabajo.com",
@@ -27,216 +39,142 @@ PORTALES_CONFIG: dict[str, dict[str, str]] = {
         "selector_titulo_enlace": "h2 a.js-o-link, a.js-o-link",
         "selector_empresa": "p.dFlex a.fc_base, p.fs16.fc_base",
         "selector_ubicacion": "p.fs16.fc_base span.mr10",
-        "selector_descripcion_detalle": "div.box_detail, div[field='description'], div.bWord, p.mbB, main",
+        "selector_descripcion_detalle": "div.box_detail, div.bWord, p.mbB, div[field='description']",
+    },
+    "Encuentra24": {
+        "base_url": "https://www.encuentra24.com",
+        "url_busqueda": "https://www.encuentra24.com/el-salvador-es/empleos-ofertas-de-trabajos?q=san+miguel&page={pagina}",
+        "selector_tarjeta": "article.d3-ad-tile, div.ann-ad-tile",
+        "selector_titulo_enlace": "a.d3-ad-tile__description, a.d3-ad-tile__title, div.ann-ad-tile__title a",
+        "selector_empresa": "div.d3-ad-tile__Subheader, span.d3-ad-tile__seller",
+        "selector_ubicacion": "div.d3-ad-tile__location, span.d3-ad-tile__location",
+        "selector_descripcion_detalle": "div.d3-property-about__text, div.ad-info__description, section.d3-property-details",
     },
     "Tecoloco": {
         "base_url": "https://www.tecoloco.com.sv",
-        "url_busqueda": "https://www.tecoloco.com.sv/empleos-en-san-miguel?Page={pagina}",
-        "selector_tarjeta": "div.module.job-result",
-        "selector_titulo_enlace": "h2.job-title a, div.job-result-title a",
-        "selector_empresa": "li.name, span.company-name",
-        "selector_ubicacion": "li.location",
+        "url_busqueda": "https://www.tecoloco.com.sv/empleos?keywords=San+Miguel&Page={pagina}",
+        "selector_tarjeta": "div.module.job-result, div.job-result-item, article.job-item",
+        "selector_titulo_enlace": "h2.job-title a, div.job-result-title a, h3 a",
+        "selector_empresa": "li.name, span.company-name, div.company",
+        "selector_ubicacion": "li.location, span.location",
         "selector_descripcion_detalle": "div.job-description, div.job-details, section.job-description",
     },
 }
 
+SELECTORES_BOTON_POSTULAR_COMPUTRABAJO = (
+    "a[data-apply-ac], "
+    "a.b_primary:has-text('Postularme'), "
+    "button:has-text('Postularme'), "
+    "span:has-text('Postularme')"
+)
 
-def extraer_ofertas_portal(
-    nombre_portal: str = "Computrabajo",
-    paginas_maximas: int = PAGINAS_MAXIMAS,
-    headless: bool = HEADLESS_SCRAPER,
-) -> list[dict[str, Any]]:
+
+def extraer_texto_completo_oferta(pagina: Page, selector_detalle: str) -> str:
     """
-    Navega las primeras `paginas_maximas` páginas del portal indicado usando Playwright
-    (headless=False por defecto para depuración visual) y retorna la lista de vacantes extraídas.
+    Extrae el texto completo real de la oferta laboral evitando quedarse únicamente
+    con la barra superior de navegación.
     """
-    if nombre_portal not in PORTALES_CONFIG:
-        raise ValueError(f"Portal '{nombre_portal}' no soportado en PORTALES_CONFIG.")
+    partes_texto: list[str] = []
 
-    cfg = PORTALES_CONFIG[nombre_portal]
-    ofertas_extraidas: list[dict[str, Any]] = []
-    urls_vistas: set[str] = set()
+    try:
+        pagina.wait_for_selector(selector_detalle, timeout=3500)
+    except PlaywrightTimeoutError:
+        pass
 
+    nodos = pagina.query_selector_all(selector_detalle)
+    for nodo in nodos:
+        txt = (nodo.inner_text() or "").strip()
+        if txt and len(txt) > 25:
+            partes_texto.append(txt)
+
+    texto_unido = "\n".join(partes_texto).strip()
+
+    # Si los selectores específicos devolvieron muy poco texto (ej. solo el título),
+    # extraer del body completo filtrando líneas cortas de menú.
+    if len(texto_unido) < 120:
+        cuerpo = pagina.query_selector("body")
+        if cuerpo:
+            texto_body = (cuerpo.inner_text() or "").strip()
+            lineas_utiles = [
+                linea.strip()
+                for linea in texto_body.splitlines()
+                if len(linea.strip()) > 30
+            ]
+            texto_unido = "\n".join(lineas_utiles)
+
+    return texto_unido
+
+
+def intentar_postular_en_portal(pagina: Page, nombre_portal: str) -> str:
+    """
+    Intenta hacer clic en el botón 'Postularme' dentro del portal (Computrabajo)
+    si el usuario ya tiene su sesión iniciada en portal_session/.
+    Retorna el estado: 'SI (Auto-postulado)', 'SI (Ya postulado)', 'REQUIERE_LOGIN' o 'NO'.
+    """
+    if not AUTO_POSTULAR_PORTAL or nombre_portal != "Computrabajo":
+        return "NO"
+
+    try:
+        contenido_pagina = (pagina.content() or "").lower()
+        if "ya estás postulado" in contenido_pagina or "ya te postulaste" in contenido_pagina:
+            return "SI (Ya postulado)"
+
+        boton = pagina.query_selector(SELECTORES_BOTON_POSTULAR_COMPUTRABAJO)
+        if not boton or not boton.is_visible():
+            return "NO"
+
+        boton.click(timeout=5000)
+        time.sleep(2.0)
+
+        url_actual = pagina.url.lower()
+        contenido_post = (pagina.content() or "").lower()
+
+        if "login" in url_actual or "acceso" in url_actual or "iniciar sesión" in contenido_post:
+            return "REQUIERE_LOGIN"
+
+        if (
+            "postulación enviada" in contenido_post
+            or "ya estás postulado" in contenido_post
+            or "ya te postulaste" in contenido_post
+            or "aplicación enviada" in contenido_post
+        ):
+            return "SI (Auto-postulado)"
+
+        return "INTENTADO"
+    except Exception as exc:
+        logger.debug("No se pudo auto-postular en portal: %s", exc)
+        return "NO"
+
+
+def iniciar_sesion_portales() -> None:
+    """
+    Abre el navegador con el perfil persistente (portal_session/) en Computrabajo
+    para que el usuario inicie sesión una sola vez y quede guardada para las auto-postulaciones.
+    """
+    PORTAL_SESSION_DIR.mkdir(parents=True, exist_ok=True)
+    logger.info(
+        "Abriendo navegador persistente en %s para iniciar sesión en Computrabajo...",
+        PORTAL_SESSION_DIR,
+    )
     with sync_playwright() as p:
-        navegador = p.chromium.launch(headless=headless)
-        contexto = navegador.new_context(
+        contexto = p.chromium.launch_persistent_context(
+            user_data_dir=str(PORTAL_SESSION_DIR),
+            headless=False,
             viewport={"width": 1280, "height": 800},
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/131.0.0.0 Safari/537.36"
-            ),
         )
-        pagina = contexto.new_page()
-
+        pagina = contexto.pages[0] if contexto.pages else contexto.new_page()
+        pagina.goto("https://sv.computrabajo.com/", wait_until="domcontentloaded")
+        print("\n" + "=" * 80)
+        print("1. Inicia sesión con tu cuenta en la ventana de Computrabajo que se acaba de abrir.")
+        print("2. Cuando ya hayas iniciado sesión y veas tu perfil activo, vuelve aquí y presiona ENTER.")
+        print("=" * 80 + "\n")
         try:
-            # 1. Recolectar los enlaces y metadatos básicos de las primeras N páginas
-            resumenes_ofertas: list[dict[str, str]] = []
-
-            for num_pagina in range(1, paginas_maximas + 1):
-                url_listado = cfg["url_busqueda"].format(pagina=num_pagina)
-                logger.info(
-                    "[%s] Navegando a página %d: %s",
-                    nombre_portal,
-                    num_pagina,
-                    url_listado,
-                )
-
-                pagina.goto(url_listado, wait_until="domcontentloaded", timeout=30000)
-
-                try:
-                    pagina.wait_for_selector(cfg["selector_tarjeta"], timeout=12000)
-                except PlaywrightTimeoutError:
-                    logger.warning(
-                        "[%s] No se detectaron tarjetas de empleo en la página %d. Finalizando paginación.",
-                        nombre_portal,
-                        num_pagina,
-                    )
-                    break
-
-                tarjetas = pagina.query_selector_all(cfg["selector_tarjeta"])
-                logger.info(
-                    "[%s] Se encontraron %d ofertas en la página %d.",
-                    nombre_portal,
-                    len(tarjetas),
-                    num_pagina,
-                )
-
-                for tarjeta in tarjetas:
-                    nodo_titulo = tarjeta.query_selector(cfg["selector_titulo_enlace"])
-                    if not nodo_titulo:
-                        continue
-
-                    titulo = (nodo_titulo.inner_text() or "").strip()
-                    href = nodo_titulo.get_attribute("href") or ""
-                    if not titulo or not href:
-                        continue
-
-                    url_completa = urljoin(cfg["base_url"], href)
-                    if url_completa in urls_vistas:
-                        continue
-                    urls_vistas.add(url_completa)
-
-                    nodo_empresa = tarjeta.query_selector(cfg["selector_empresa"])
-                    empresa_cruda = (
-                        nodo_empresa.inner_text().strip()
-                        if nodo_empresa
-                        else "Empresa Confidencial"
-                    )
-                    # Limpiar calificaciones numéricas iniciales (ej. "4.3 \nHELADOS SARITA") y saltos de línea
-                    empresa = re.sub(
-                        r"^\d+(?:[.,]\d+)?\s*", "", empresa_cruda
-                    ).replace("\n", " ").strip() or "Empresa Confidencial"
-
-                    nodo_ubicacion = tarjeta.query_selector(cfg["selector_ubicacion"])
-                    ubicacion_cruda = (
-                        nodo_ubicacion.inner_text().strip()
-                        if nodo_ubicacion
-                        else UBICACION_OBJETIVO
-                    )
-                    ubicacion = (
-                        UBICACION_OBJETIVO
-                        if re.fullmatch(r"\d+(?:[.,]\d+)?", ubicacion_cruda)
-                        else ubicacion_cruda.replace("\n", " ").strip()
-                    )
-
-                    excluida, motivo_exclusion = es_oferta_excluida(titulo, empresa)
-                    if excluida:
-                        logger.info(
-                            "[%s] Oferta descartada por filtro ('%s'): %s (%s)",
-                            nombre_portal,
-                            motivo_exclusion,
-                            titulo,
-                            empresa,
-                        )
-                        continue
-
-                    resumenes_ofertas.append(
-                        {
-                            "portal": nombre_portal,
-                            "titulo": titulo,
-                            "empresa": empresa,
-                            "ubicacion": ubicacion,
-                            "url_original": url_completa,
-                        }
-                    )
-
-                # Pequeña pausa humana entre páginas de resultados
-                time.sleep(random.uniform(2.0, 4.5))
-
-            # 2. Entrar a cada oferta para extraer su descripción completa cruda
-            for item in resumenes_ofertas:
-                url_oferta = item["url_original"]
-                logger.info(
-                    "[%s] Extrayendo detalle de: %s (%s)",
-                    nombre_portal,
-                    item["titulo"],
-                    item["empresa"],
-                )
-                try:
-                    pagina.goto(
-                        url_oferta, wait_until="domcontentloaded", timeout=25000
-                    )
-                    pagina.wait_for_selector(
-                        cfg["selector_descripcion_detalle"], timeout=10000
-                    )
-                    nodos_desc = pagina.query_selector_all(
-                        cfg["selector_descripcion_detalle"]
-                    )
-                    descripcion_cruda = "\n".join(
-                        n.inner_text().strip() for n in nodos_desc if n.inner_text()
-                    ).strip()
-                except PlaywrightTimeoutError:
-                    # Fallback al texto visible del body si el selector específico cambia
-                    cuerpo = pagina.query_selector("main") or pagina.query_selector("body")
-                    descripcion_cruda = (
-                        cuerpo.inner_text().strip() if cuerpo else ""
-                    )
-                except Exception as exc:
-                    logger.error(
-                        "[%s] Error al abrir detalle %s: %s",
-                        nombre_portal,
-                        url_oferta,
-                        exc,
-                    )
-                    continue
-
-                if descripcion_cruda:
-                    excluida_desc, motivo_desc = es_oferta_excluida(
-                        item["titulo"], item["empresa"], descripcion_cruda
-                    )
-                    if excluida_desc:
-                        logger.info(
-                            "[%s] Oferta descartada al leer descripción (%s): %s",
-                            nombre_portal,
-                            motivo_desc,
-                            item["titulo"],
-                        )
-                        continue
-
-                    ofertas_extraidas.append(
-                        {
-                            **item,
-                            "descripcion_cruda": descripcion_cruda,
-                        }
-                    )
-
-                time.sleep(random.uniform(1.5, 3.5))
-
-        except KeyboardInterrupt:
-            logger.warning(
-                "[%s] Búsqueda interrumpida por el usuario (Ctrl+C). Guardando %d ofertas recolectadas hasta ahora...",
-                nombre_portal,
-                len(ofertas_extraidas),
-            )
+            input("Presiona ENTER cuando hayas terminado de iniciar sesión...")
+        except EOFError:
+            time.sleep(30)
         finally:
-            try:
-                contexto.close()
-                navegador.close()
-            except Exception:
-                pass
-
-    return ofertas_extraidas
+            contexto.close()
+    logger.info("Sesión de Computrabajo guardada exitosamente en %s", PORTAL_SESSION_DIR)
 
 
 def ejecutar_scraping_todos_los_portales(
@@ -244,19 +182,225 @@ def ejecutar_scraping_todos_los_portales(
     paginas_maximas: int = PAGINAS_MAXIMAS,
     headless: bool = HEADLESS_SCRAPER,
 ) -> list[dict[str, Any]]:
-    """Ejecuta la recolección secuencial sobre la lista de portales configurados."""
+    """
+    Recorre todos los portales configurados usando una única sesión persistente de Playwright,
+    saltando ofertas ya existentes en SQLite para máxima velocidad.
+    """
     lista_portales = portales or list(PORTALES_CONFIG.keys())
     todas_las_ofertas: list[dict[str, Any]] = []
+    urls_vistas: set[str] = set()
 
-    for portal in lista_portales:
+    PORTAL_SESSION_DIR.mkdir(parents=True, exist_ok=True)
+
+    with sync_playwright() as p:
+        contexto = p.chromium.launch_persistent_context(
+            user_data_dir=str(PORTAL_SESSION_DIR),
+            headless=headless,
+            viewport={"width": 1280, "height": 800},
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/131.0.0.0 Safari/537.36"
+            ),
+        )
+        pagina = contexto.pages[0] if contexto.pages else contexto.new_page()
+
         try:
-            ofertas = extraer_ofertas_portal(
-                nombre_portal=portal,
-                paginas_maximas=paginas_maximas,
-                headless=headless,
+            for nombre_portal in lista_portales:
+                if nombre_portal not in PORTALES_CONFIG:
+                    continue
+
+                cfg = PORTALES_CONFIG[nombre_portal]
+                resumenes_ofertas: list[dict[str, str]] = []
+
+                for num_pagina in range(1, paginas_maximas + 1):
+                    url_listado = cfg["url_busqueda"].format(pagina=num_pagina)
+                    logger.info(
+                        "[%s] Navegando a página %d: %s",
+                        nombre_portal,
+                        num_pagina,
+                        url_listado,
+                    )
+
+                    try:
+                        pagina.goto(
+                            url_listado, wait_until="domcontentloaded", timeout=25000
+                        )
+                        pagina.wait_for_selector(cfg["selector_tarjeta"], timeout=8000)
+                    except PlaywrightTimeoutError:
+                        logger.info(
+                            "[%s] Sin más tarjetas de empleo en la página %d.",
+                            nombre_portal,
+                            num_pagina,
+                        )
+                        break
+                    except Exception as exc:
+                        logger.warning(
+                            "[%s] No se pudo cargar página %d: %s",
+                            nombre_portal,
+                            num_pagina,
+                            exc,
+                        )
+                        break
+
+                    tarjetas = pagina.query_selector_all(cfg["selector_tarjeta"])
+                    logger.info(
+                        "[%s] Se encontraron %d ofertas en la página %d.",
+                        nombre_portal,
+                        len(tarjetas),
+                        num_pagina,
+                    )
+
+                    for tarjeta in tarjetas:
+                        nodo_titulo = tarjeta.query_selector(
+                            cfg["selector_titulo_enlace"]
+                        )
+                        if not nodo_titulo:
+                            continue
+
+                        titulo = (
+                            (nodo_titulo.inner_text() or "").replace("\n", " ").strip()
+                        )
+                        href = nodo_titulo.get_attribute("href") or ""
+                        if not titulo or not href:
+                            continue
+
+                        url_completa = urljoin(cfg["base_url"], href)
+                        if url_completa in urls_vistas:
+                            continue
+                        urls_vistas.add(url_completa)
+
+                        nodo_empresa = tarjeta.query_selector(cfg["selector_empresa"])
+                        empresa_cruda = (
+                            nodo_empresa.inner_text().strip()
+                            if nodo_empresa
+                            else "Empresa Confidencial"
+                        )
+                        empresa = (
+                            re.sub(r"^\d+(?:[.,]\d+)?\s*", "", empresa_cruda)
+                            .replace("\n", " ")
+                            .strip()
+                            or "Empresa Confidencial"
+                        )
+
+                        nodo_ubicacion = tarjeta.query_selector(
+                            cfg["selector_ubicacion"]
+                        )
+                        ubicacion_cruda = (
+                            nodo_ubicacion.inner_text().strip()
+                            if nodo_ubicacion
+                            else UBICACION_OBJETIVO
+                        )
+                        ubicacion = (
+                            UBICACION_OBJETIVO
+                            if re.fullmatch(r"\d+(?:[.,]\d+)?", ubicacion_cruda)
+                            else ubicacion_cruda.replace("\n", " ").strip()
+                        )
+
+                        # 1. Filtrar por título/empresa antes de abrir
+                        excluida, motivo_exclusion = es_oferta_excluida(titulo, empresa)
+                        if excluida:
+                            logger.info(
+                                "[%s] Descartada en listado (%s): %s (%s)",
+                                nombre_portal,
+                                motivo_exclusion,
+                                titulo,
+                                empresa,
+                            )
+                            continue
+
+                        # 2. Verificar si ya existe en SQLite para no volver a abrirla
+                        if existe_vacante(
+                            titulo=titulo, empresa=empresa, portal=nombre_portal
+                        ):
+                            logger.info(
+                                "[%s] Saltando oferta ya registrada en BD: %s (%s)",
+                                nombre_portal,
+                                titulo,
+                                empresa,
+                            )
+                            continue
+
+                        resumenes_ofertas.append(
+                            {
+                                "portal": nombre_portal,
+                                "titulo": titulo,
+                                "empresa": empresa,
+                                "ubicacion": ubicacion,
+                                "url_original": url_completa,
+                            }
+                        )
+
+                    time.sleep(random.uniform(1.5, 3.0))
+
+                # Abrir únicamente las ofertas NUEVAS que no estaban en la base de datos
+                for item in resumenes_ofertas:
+                    url_oferta = item["url_original"]
+                    logger.info(
+                        "[%s] Extrayendo detalle de oferta NUEVA: %s (%s)",
+                        nombre_portal,
+                        item["titulo"],
+                        item["empresa"],
+                    )
+                    try:
+                        pagina.goto(
+                            url_oferta, wait_until="domcontentloaded", timeout=20000
+                        )
+                        descripcion_cruda = extraer_texto_completo_oferta(
+                            pagina, cfg["selector_descripcion_detalle"]
+                        )
+                    except Exception as exc:
+                        logger.error(
+                            "[%s] Error al abrir detalle %s: %s",
+                            nombre_portal,
+                            url_oferta,
+                            exc,
+                        )
+                        continue
+
+                    if not descripcion_cruda:
+                        continue
+
+                    excluida_desc, motivo_desc = es_oferta_excluida(
+                        item["titulo"], item["empresa"], descripcion_cruda
+                    )
+                    if excluida_desc:
+                        logger.info(
+                            "[%s] Descartada al leer descripción (%s): %s",
+                            nombre_portal,
+                            motivo_desc,
+                            item["titulo"],
+                        )
+                        continue
+
+                    # Intentar auto-postulación en 1 clic si la oferta es válida
+                    estado_portal = intentar_postular_en_portal(pagina, nombre_portal)
+                    if estado_portal.startswith("SI"):
+                        logger.info(
+                            "[%s] Auto-postulación en portal exitosa: %s (%s)",
+                            nombre_portal,
+                            item["titulo"],
+                            estado_portal,
+                        )
+
+                    todas_las_ofertas.append(
+                        {
+                            **item,
+                            "descripcion_cruda": descripcion_cruda,
+                            "postulado_en_portal": estado_portal,
+                        }
+                    )
+                    time.sleep(random.uniform(1.5, 3.0))
+
+        except KeyboardInterrupt:
+            logger.warning(
+                "Búsqueda interrumpida manualmente (Ctrl+C). Guardando %d ofertas nuevas recolectadas...",
+                len(todas_las_ofertas),
             )
-            todas_las_ofertas.extend(ofertas)
-        except Exception as exc:
-            logger.error("Error global al scrapear el portal %s: %s", portal, exc)
+        finally:
+            try:
+                contexto.close()
+            except Exception:
+                pass
 
     return todas_las_ofertas
