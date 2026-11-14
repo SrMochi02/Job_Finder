@@ -22,13 +22,18 @@ from playwright.sync_api import (
 from config import (
     AUTO_POSTULAR_PORTAL,
     DIRECCION_RESIDENCIA,
+    EDAD_POSTULANTE,
+    ESTADO_CIVIL_POSTULANTE,
     GMAIL_USER,
     HEADLESS_SCRAPER,
+    MOTIVO_SALIDA_ULTIMO_EMPLEO,
     PAGINAS_MAXIMAS,
     PORTAL_SESSION_DIR,
     PRETENSION_SALARIAL,
+    REMITENTE_NOMBRE,
     REMITENTE_TELEFONO,
     UBICACION_OBJETIVO,
+    ULTIMO_SALARIO,
 )
 from database import existe_vacante, registrar_oferta_descartada
 from parser import es_oferta_excluida
@@ -111,13 +116,19 @@ def extraer_texto_completo_oferta(pagina: Page, selector_detalle: str) -> str:
 
 def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
     """
-    Analiza una pregunta de selección de Computrabajo y devuelve la respuesta
-    exacta basada en el CV real del postulante (tanto en texto corto de chat,
-    como en opción Sí/No y número).
+    Analiza cualquier pregunta de selección de Computrabajo y devuelve la respuesta
+    exacta basada en el CV y los datos del candidato en .env.
     """
     q = pregunta_raw.lower()
 
-    # 1. Pretensión salarial / salario esperado (como en la captura: responde '450')
+    # 1. Último salario devengado vs Pretensión salarial
+    if any(p in q for p in ("último salario", "ultimo salario", "salario anterior", "cuánto ganaba", "cuanto ganaba")):
+        return {
+            "si_no": "si",
+            "numero": ULTIMO_SALARIO,
+            "texto": f"${ULTIMO_SALARIO}",
+        }
+
     if any(
         p in q
         for p in (
@@ -138,7 +149,27 @@ def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
             "texto": PRETENSION_SALARIAL,
         }
 
-    # 2. Dirección exacta de residencia / domicilio / ubicación
+    # 2. Teléfono / WhatsApp / Celular de contacto
+    if any(
+        p in q
+        for p in (
+            "teléfono",
+            "telefono",
+            "celular",
+            "whatsapp",
+            "número de contacto",
+            "numero de contacto",
+            "número telefónico",
+            "numero telefonico",
+        )
+    ):
+        return {
+            "si_no": "si",
+            "numero": re.sub(r"\D", "", REMITENTE_TELEFONO)[-8:] or "00000000",
+            "texto": REMITENTE_TELEFONO,
+        }
+
+    # 3. Dirección exacta de residencia / domicilio / colonia
     if any(
         p in q
         for p in (
@@ -159,20 +190,12 @@ def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
             "texto": DIRECCION_RESIDENCIA,
         }
 
-    # 3. ¿Reside en San Miguel? (Pregunta cerrada o de confirmación)
-    if "san miguel" in q or "reside" in q or "vivir" in q:
+    # 4. ¿Reside en San Miguel?
+    if "san miguel" in q or "reside" in q or "vivir" in q or "zona oriental" in q:
         return {
             "si_no": "si",
             "numero": "1",
             "texto": f"Sí, resido en {DIRECCION_RESIDENCIA}.",
-        }
-
-    # 4. Teléfono / WhatsApp / Celular de contacto
-    if any(p in q for p in ("teléfono", "telefono", "celular", "whatsapp", "número de contacto", "numero de contacto")):
-        return {
-            "si_no": "si",
-            "numero": re.sub(r"\D", "", REMITENTE_TELEFONO)[-8:] or "73232022",
-            "texto": REMITENTE_TELEFONO or "San Miguel",
         }
 
     # 5. Correo electrónico
@@ -183,7 +206,48 @@ def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
             "texto": GMAIL_USER,
         }
 
-    # 6. Preguntas sobre licencia o vehículo/moto
+    # 6. Edad / Fecha de nacimiento
+    if any(p in q for p in ("edad", "cuántos años tiene", "cuantos años tiene", "fecha de nacimiento")):
+        solo_num_edad = re.sub(r"\D", "", EDAD_POSTULANTE) or "21"
+        return {
+            "si_no": "si",
+            "numero": solo_num_edad,
+            "texto": EDAD_POSTULANTE,
+        }
+
+    # 7. Estado civil / Hijos / Familia / Personas que dependen de usted
+    if any(p in q for p in ("estado civil", "casado", "soltero", "acompañado", "hijos", "dependen", "carga familiar", "familia")):
+        return {
+            "si_no": "si",
+            "numero": "1",
+            "texto": f"{ESTADO_CIVIL_POSTULANTE}, con responsabilidad familiar y total compromiso de estabilidad laboral.",
+        }
+
+    # 8. Motivo de salida / retiro de su último empleo
+    if any(p in q for p in ("motivo de salida", "motivo de retiro", "por qué salió", "por que salio", "dejó su último", "ultimo empleo", "último trabajo")):
+        return {
+            "si_no": "si",
+            "numero": "1",
+            "texto": MOTIVO_SALIDA_ULTIMO_EMPLEO,
+        }
+
+    # 9. Antecedentes penales / Solvencia PNC / DUI / NIT / Documentos en regla
+    if any(p in q for p in ("antecedentes", "solvencia", "pnc", "policial", "penal", "documentos", "dui", "isss", "afp")):
+        return {
+            "si_no": "si",
+            "numero": "1",
+            "texto": "Sí, cuento con mis documentos personales en regla, solvencia policial y antecedentes penales limpios.",
+        }
+
+    # 10. Cómo se transporta / Medio de transporte
+    if any(p in q for p in ("cómo se transporta", "como se transporta", "medio de transporte", "traslada", "desplaza")):
+        return {
+            "si_no": "si",
+            "numero": "1",
+            "texto": "Me traslado puntualmente en transporte urbano/público dentro de San Miguel.",
+        }
+
+    # 11. Preguntas sobre licencia o vehículo/moto
     if any(p in q for p in ("licencia", "motocicleta", "moto", "vehículo", "vehiculo", "conducir", "manejar")):
         return {
             "si_no": "no",
@@ -191,23 +255,31 @@ def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
             "texto": "No poseo licencia ni vehículo propio, pero resido en San Miguel con disponibilidad y puntualidad total.",
         }
 
-    # 7. Preguntas sobre si estudia actualmente (horarios de clases)
-    if any(p in q for p in ("estudia actualmente", "estudiando actualmente", "horario de estudio", "clases")):
+    # 12. Preguntas sobre si estudia actualmente (horarios de clases)
+    if any(p in q for p in ("estudia actualmente", "estudiando actualmente", "horario de estudio", "clases", "universidad actualmente")):
         return {
             "si_no": "no",
             "numero": "0",
-            "texto": "No, ya soy egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE), tengo disponibilidad completa de horario.",
+            "texto": "No estudio actualmente; ya soy egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE), por lo que tengo disponibilidad completa de horario.",
         }
 
-    # 8. Disponibilidad inmediata / horarios / fines de semana / turnos
-    if any(p in q for p in ("disponibilidad", "horario", "turnos", "fines de semana", "inmediata")):
+    # 13. Disponibilidad inmediata / horarios / fines de semana / días festivos / turnos rotativos
+    if any(p in q for p in ("disponibilidad", "horario", "turnos", "fines de semana", "festivos", "inmediata", "rotativo")):
         return {
             "si_no": "si",
             "numero": "1",
-            "texto": "Sí, cuento con disponibilidad inmediata y de horarios en San Miguel.",
+            "texto": "Sí, cuento con disponibilidad inmediata para trabajar tiempo completo, fines de semana, días festivos y turnos requeridos.",
         }
 
-    # 9. Experiencia en caja, facturación, inventario, bodega, atención al cliente, ventas o administración
+    # 14. Experiencia en farmacia / medicamentos / clínica / salud
+    if any(p in q for p in ("farmacia", "medicamento", "clínica", "clinica", "médico", "medico", "insumos", "hospital", "salud")):
+        return {
+            "si_no": "si",
+            "numero": "2",
+            "texto": "Sí, trabajé más de 2 años en Clínica Otorrinolaringológica Cliniciru (Hospital San Francisco, San Miguel) a cargo del inventario físico de insumos médicos, suministros, proveedores, caja chica y atención a pacientes.",
+        }
+
+    # 15. Experiencia en caja, facturación, inventario, bodega, atención al cliente, ventas o administración
     if any(
         p in q
         for p in (
@@ -231,15 +303,15 @@ def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
         return {
             "si_no": "si",
             "numero": "2",
-            "texto": "Sí, más de 2 años de experiencia en atención al cliente, caja chica, facturación, control de inventarios en bodega y proveedores, más labores operativas de carga y mantenimiento.",
+            "texto": "Sí, cuento con más de 2 años de experiencia comprobada en atención al cliente, manejo y cuadre de caja chica, facturación, control físico de inventarios en bodega y recepción de proveedores, más labores operativas de carga.",
         }
 
-    # 10. Estudios, sistemas, computación, Excel, Office o inglés
+    # 16. Estudios, sistemas, computación, Excel, Office o inglés
     if any(p in q for p in ("excel", "office", "ofimática", "ofimatica", "computación", "computacion", "sistemas", "software", "inglés", "ingles", "estudio", "título", "titulo", "nivel académico", "nivel academico")):
         return {
             "si_no": "si",
             "numero": "2",
-            "texto": "Egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE), con manejo de Excel/Ofimática, bases de datos SQL e inglés A2.",
+            "texto": "Egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE) y Bachiller Técnico en Software, con dominio de Excel/Ofimática, bases de datos SQL e inglés nivel A2.",
         }
 
     # Respuesta general formal basada en el CV para cualquier otra pregunta abierta

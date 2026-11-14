@@ -18,6 +18,13 @@ REMITENTE_NOMBRE: str = os.getenv("REMITENTE_NOMBRE", "Candidato")
 REMITENTE_TELEFONO: str = os.getenv("REMITENTE_TELEFONO", "")
 DIRECCION_RESIDENCIA: str = os.getenv("DIRECCION_RESIDENCIA", "San Miguel, El Salvador")
 PRETENSION_SALARIAL: str = os.getenv("PRETENSION_SALARIAL", "450")
+ULTIMO_SALARIO: str = os.getenv("ULTIMO_SALARIO", "380")
+EDAD_POSTULANTE: str = os.getenv("EDAD_POSTULANTE", "21 años")
+ESTADO_CIVIL_POSTULANTE: str = os.getenv("ESTADO_CIVIL_POSTULANTE", "Acompañado")
+MOTIVO_SALIDA_ULTIMO_EMPLEO: str = os.getenv(
+    "MOTIVO_SALIDA_ULTIMO_EMPLEO",
+    "Búsqueda de superación profesional y estabilidad laboral a largo plazo.",
+)
 
 # Rutas de archivos y directorios
 CV_PATH: Path = Path(os.getenv("CV_PATH", str(BASE_DIR / "cv_postulante.pdf"))).resolve()
