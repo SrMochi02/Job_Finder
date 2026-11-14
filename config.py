@@ -55,9 +55,9 @@ _EXCLUIDAS_DEFAULT = (
     "cocina,cocinero,cocinera,chef,mesero,mesera,lavaplatos,restaurante,"
     "pupuseria,panadero,pastelero,barista,parrillero,comida rapida,gastronomia,bartender,steward,"
     "medico,doctor,doctora,enfermera,enfermero,odontologo,farmaceutico,farmacia,regente,abogado,notario,"
-    "contador publico,auditor externo,arquitecto,ingeniero civil,ingeniero agronomo,psicologo,"
-    "profesor,profesora,docente,maestro,maestra,mecanico,automotriz,perito,"
-    "tecnico en limpieza,ordenanza,conserje,impulsadora,vendedor de campo,trabajo de campo,cambaceo,"
+    "contador publico,auditor externo,arquitecto,arquitectura,arq,ingeniero civil,ing civil,ingeniero agronomo,ing agronomo,ingeniero industrial,ing industrial,ingeniero electrico,ing electrico,ingeniero mecanico,psicologo,psicologa,"
+    "profesor,profesora,docente,maestro,maestra,mecanico,automotriz,perito,topografo,"
+    "tecnico en limpieza,ordenanza,conserje,impulsadora,vendedor de campo,trabajo de campo,gestor de campo,cambaceo,"
     "motorista,conductor,chofer,repartidor,rutero,mensajero,motociclista,delivery,"
     "cabezal,licencia,rastre,guardia armado,seguridad privada,supervisor,coordinador,gerente,jefe"
 )

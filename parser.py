@@ -187,6 +187,12 @@ def es_oferta_excluida(
         "ventas detalle",
         "vendedor de ruta",
         "ventas de ruta",
+        "gestor de campo",
+        "arq",
+        "ing civil",
+        "ingeniero civil",
+        "arquitecto",
+        "arquitectura",
     ):
         if re.search(rf"\b{re.escape(cargo_inaccesible)}\b", titulo_norm):
             return True, f"cargo de supervisión/ruta o nivel inaccesible: '{cargo_inaccesible}'"
