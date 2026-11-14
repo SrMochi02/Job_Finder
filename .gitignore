@@ -10,8 +10,9 @@ env/
 *.db
 *.sqlite3
 
-# Perfil persistente de navegador (Playwright / WhatsApp Web)
+# Perfil persistente de navegador (Playwright / WhatsApp Web / Portales)
 whatsapp_session/
+portal_session/
 playwright_profile/
 browser_data/
 

@@ -23,6 +23,14 @@ DB_PATH: Path = Path(os.getenv("DB_PATH", str(BASE_DIR / "jobfinder.db"))).resol
 WHATSAPP_SESSION_DIR: Path = Path(
     os.getenv("WHATSAPP_SESSION_DIR", str(BASE_DIR / "whatsapp_session"))
 ).resolve()
+PORTAL_SESSION_DIR: Path = Path(
+    os.getenv("PORTAL_SESSION_DIR", str(BASE_DIR / "portal_session"))
+).resolve()
+AUTO_POSTULAR_PORTAL: bool = os.getenv("AUTO_POSTULAR_PORTAL", "True").strip().lower() in (
+    "true",
+    "1",
+    "yes",
+)
 
 # Parámetros de scraping
 UBICACION_OBJETIVO: str = os.getenv("UBICACION_OBJETIVO", "San Miguel")
@@ -33,13 +41,14 @@ HEADLESS_SCRAPER: bool = os.getenv("HEADLESS_SCRAPER", "False").strip().lower() 
     "yes",
 )
 
-# Sectores o palabras clave excluidas (cocina, conducción/licencia, cargos de supervisión/gerencia, carreras médicas/docencia/mecánica)
+# Sectores o palabras clave excluidas (cocina, conducción/licencia, cargos de supervisión/gerencia, carreras médicas/docencia/mecánica/campo/limpieza)
 _EXCLUIDAS_DEFAULT = (
     "cocina,cocinero,cocinera,chef,mesero,mesera,lavaplatos,restaurante,"
     "pupuseria,panadero,pastelero,barista,parrillero,comida rapida,gastronomia,bartender,steward,"
     "medico,doctor,doctora,enfermera,enfermero,odontologo,farmaceutico,farmacia,regente,abogado,notario,"
     "contador publico,auditor externo,arquitecto,ingeniero civil,ingeniero agronomo,psicologo,"
     "profesor,profesora,docente,maestro,maestra,mecanico,automotriz,perito,"
+    "tecnico en limpieza,ordenanza,conserje,impulsadora,vendedor de campo,trabajo de campo,cambaceo,"
     "motorista,conductor,chofer,repartidor,rutero,mensajero,motociclista,delivery,"
     "cabezal,licencia,rastre,guardia armado,seguridad privada,supervisor,coordinador,gerente,jefe"
 )
