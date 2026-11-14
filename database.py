@@ -23,6 +23,7 @@ COLUMNAS_ADICIONALES_VACANTES: dict[str, str] = {
     "telefonos_empresa": "TEXT DEFAULT ''",
     "resumen_oferta": "TEXT DEFAULT ''",
     "consejo_preparacion": "TEXT DEFAULT ''",
+    "postulado_en_portal": "TEXT DEFAULT 'NO'",
     "llamaron_entrevista": "TEXT DEFAULT 'NO'",
     "notas_entrevista": "TEXT DEFAULT ''",
 }
@@ -47,6 +48,25 @@ def generar_hash_vacante(titulo: str, empresa: str, portal: str) -> str:
     return hashlib.sha256(clave_normalizada.encode("utf-8")).hexdigest()
 
 
+def existe_vacante(
+    titulo: str,
+    empresa: str,
+    portal: str = "Computrabajo",
+    db_path: Path = DB_PATH,
+) -> bool:
+    """
+    Consulta en 1 milisegundo si la vacante ya existe en SQLite para que el scraper
+    no pierda tiempo volviendo a abrir ofertas ya registradas.
+    """
+    if not db_path.exists():
+        return False
+    vacante_id = generar_hash_vacante(titulo=titulo, empresa=empresa, portal=portal)
+    with obtener_conexion(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM vacantes WHERE id = ? LIMIT 1;", (vacante_id,))
+        return cursor.fetchone() is not None
+
+
 def inicializar_bd(db_path: Path = DB_PATH) -> None:
     """Crea las tablas 'vacantes' y 'postulaciones' y asegura todas las columnas de empresa/entrevista."""
     with obtener_conexion(db_path) as conn:
@@ -69,6 +89,7 @@ def inicializar_bd(db_path: Path = DB_PATH) -> None:
                 telefonos_empresa TEXT DEFAULT '',
                 resumen_oferta TEXT DEFAULT '',
                 consejo_preparacion TEXT DEFAULT '',
+                postulado_en_portal TEXT DEFAULT 'NO',
                 llamaron_entrevista TEXT DEFAULT 'NO',
                 notas_entrevista TEXT DEFAULT ''
             );
@@ -128,6 +149,7 @@ def guardar_vacante(
     telefonos_empresa: str = "",
     resumen_oferta: str = "",
     consejo_preparacion: str = "",
+    postulado_en_portal: str = "NO",
     db_path: Path = DB_PATH,
 ) -> tuple[str, bool]:
     """
@@ -148,8 +170,9 @@ def guardar_vacante(
             INSERT INTO vacantes (
                 id, portal, titulo, empresa, ubicacion, url_original, descripcion_cruda,
                 fecha_deteccion, area_afinidad, salario_ofrecido, correos_empresa,
-                telefonos_empresa, resumen_oferta, consejo_preparacion, llamaron_entrevista, notas_entrevista
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NO', '');
+                telefonos_empresa, resumen_oferta, consejo_preparacion, postulado_en_portal,
+                llamaron_entrevista, notas_entrevista
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NO', '');
             """,
             (
                 vacante_id,
@@ -166,6 +189,7 @@ def guardar_vacante(
                 telefonos_empresa.strip(),
                 resumen_oferta.strip(),
                 consejo_preparacion.strip(),
+                postulado_en_portal.strip(),
             ),
         )
         conn.commit()
@@ -369,6 +393,7 @@ def obtener_directorio_empresas(db_path: Path = DB_PATH) -> list[dict[str, Any]]
                 v.salario_ofrecido,
                 v.correos_empresa,
                 v.telefonos_empresa,
+                v.postulado_en_portal,
                 v.consejo_preparacion,
                 v.llamaron_entrevista,
                 v.notas_entrevista,
@@ -403,6 +428,7 @@ def exportar_reporte_empresas_csv(
         "salario_ofrecido",
         "correos_empresa",
         "telefonos_empresa",
+        "postulado_en_portal",
         "estado_postulaciones",
         "llamaron_entrevista",
         "notas_entrevista",
