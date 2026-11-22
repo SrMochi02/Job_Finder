@@ -161,7 +161,10 @@ def _lanzar_contexto_whatsapp(p: Any, directorio_sesion: Path) -> Any:
         return p.chromium.launch_persistent_context(**opciones)
 
 
-def iniciar_sesion_whatsapp(directorio_sesion: Path = WHATSAPP_SESSION_DIR) -> None:
+def iniciar_sesion_whatsapp(
+    directorio_sesion: Path = WHATSAPP_SESSION_DIR,
+    esperar_cierre_navegador: bool = False,
+) -> None:
     """
     Abre WhatsApp Web en el perfil persistente (whatsapp_session/) para que el usuario
     escanee el código QR con calma una sola vez y deje sincronizados sus chats.
@@ -182,19 +185,34 @@ def iniciar_sesion_whatsapp(directorio_sesion: Path = WHATSAPP_SESSION_DIR) -> N
 
         pagina = contexto.pages[0] if contexto.pages else contexto.new_page()
         pagina.goto("https://web.whatsapp.com/", wait_until="domcontentloaded")
-        print("\n" + "=" * 80)
-        print(
-            f"1. Escanea el código QR en la ventana de WhatsApp Web con tu celular ({REMITENTE_TELEFONO or 'tu número'})."
-        )
-        print("2. Espera unos segundos a que carguen tus chats en pantalla.")
-        print("3. Cuando ya veas tus chats cargados, vuelve a esta ventana negra y presiona ENTER.")
-        print("=" * 80 + "\n")
-        try:
-            input("Presiona ENTER cuando tu WhatsApp Web ya esté vinculado y cargado...")
-        except EOFError:
-            time.sleep(30)
-        finally:
-            contexto.close()
+        if esperar_cierre_navegador:
+            logger.info(
+                "Escanea el código QR en WhatsApp Web, espera a que carguen tus chats y cierra la ventana del navegador para guardar la sesión."
+            )
+            try:
+                while contexto.pages:
+                    time.sleep(1.0)
+            except Exception:
+                pass
+            finally:
+                try:
+                    contexto.close()
+                except Exception:
+                    pass
+        else:
+            print("\n" + "=" * 80)
+            print(
+                f"1. Escanea el código QR en la ventana de WhatsApp Web con tu celular ({REMITENTE_TELEFONO or 'tu número'})."
+            )
+            print("2. Espera unos segundos a que carguen tus chats en pantalla.")
+            print("3. Cuando ya veas tus chats cargados, vuelve a esta ventana negra y presiona ENTER.")
+            print("=" * 80 + "\n")
+            try:
+                input("Presiona ENTER cuando tu WhatsApp Web ya esté vinculado y cargado...")
+            except EOFError:
+                time.sleep(30)
+            finally:
+                contexto.close()
     logger.info("Sesión de WhatsApp Web guardada exitosamente en %s", directorio_sesion)
 
 

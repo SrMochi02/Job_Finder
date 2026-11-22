@@ -21,10 +21,32 @@ PRETENSION_SALARIAL: str = os.getenv("PRETENSION_SALARIAL", "450")
 ULTIMO_SALARIO: str = os.getenv("ULTIMO_SALARIO", "380")
 EDAD_POSTULANTE: str = os.getenv("EDAD_POSTULANTE", "21 años")
 ESTADO_CIVIL_POSTULANTE: str = os.getenv("ESTADO_CIVIL_POSTULANTE", "Acompañado")
+RESPUESTA_HIJOS: str = os.getenv("RESPUESTA_HIJOS", "Sí, esperando una hija próximamente.")
+POSEE_LICENCIA_VEHICULO: str = os.getenv("POSEE_LICENCIA_VEHICULO", "NO")
+ESTUDIA_ACTUALMENTE: str = os.getenv("ESTUDIA_ACTUALMENTE", "NO")
+NIVEL_ACADEMICO: str = os.getenv(
+    "NIVEL_ACADEMICO",
+    "Egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE) y Bachiller Técnico en Software.",
+)
+RESUMEN_EXPERIENCIA_CV: str = os.getenv(
+    "RESUMEN_EXPERIENCIA_CV",
+    "Más de 2 años de experiencia comprobada en atención al cliente, manejo y cuadre de caja chica, facturación, control físico de inventarios en bodega y recepción de proveedores, más labores operativas.",
+)
+CARTA_PRESENTACION: str = os.getenv(
+    "CARTA_PRESENTACION",
+    "Buen día. Pongo a su disposición mi CV para la vacante. Cuento con más de 2 años de experiencia en asistencia administrativa, atención al cliente, manejo de caja chica, facturación y control físico de inventarios, además de experiencia operativa en bodega y formación técnica. Resido en la zona y tengo disponibilidad inmediata. Saludos cordiales.",
+)
 MOTIVO_SALIDA_ULTIMO_EMPLEO: str = os.getenv(
     "MOTIVO_SALIDA_ULTIMO_EMPLEO",
     "Búsqueda de superación profesional y estabilidad laboral a largo plazo.",
 )
+AREAS_ACTIVA_STR: str = os.getenv(
+    "AREAS_ACTIVAS",
+    "administrativo_atencion,logistica_operaciones,ventas_comercial,soporte_sistemas,programacion_software",
+)
+AREAS_ACTIVAS: list[str] = [
+    a.strip() for a in AREAS_ACTIVA_STR.split(",") if a.strip()
+]
 
 # Rutas de archivos y directorios
 CV_PATH: Path = Path(os.getenv("CV_PATH", str(BASE_DIR / "cv_postulante.pdf"))).resolve()
@@ -207,3 +229,110 @@ def validar_configuracion_correo() -> tuple[bool, str]:
     if not CV_PATH.exists() or not CV_PATH.is_file():
         return False, f"No se encontró el archivo CV en la ruta: {CV_PATH}"
     return True, "Configuración de correo válida"
+
+
+def recargar_configuracion() -> None:
+    """Recarga todas las variables de configuración en caliente desde el archivo .env."""
+    global GMAIL_USER, GMAIL_APP_PASSWORD, REMITENTE_NOMBRE, REMITENTE_TELEFONO
+    global DIRECCION_RESIDENCIA, PRETENSION_SALARIAL, ULTIMO_SALARIO, EDAD_POSTULANTE
+    global ESTADO_CIVIL_POSTULANTE, RESPUESTA_HIJOS, POSEE_LICENCIA_VEHICULO
+    global ESTUDIA_ACTUALMENTE, NIVEL_ACADEMICO, RESUMEN_EXPERIENCIA_CV, CARTA_PRESENTACION
+    global MOTIVO_SALIDA_ULTIMO_EMPLEO, AREAS_ACTIVA_STR, AREAS_ACTIVAS, CV_PATH
+    global AUTO_POSTULAR_PORTAL, UBICACION_OBJETIVO, PAGINAS_MAXIMAS, HEADLESS_SCRAPER
+    global PALABRAS_EXCLUIDAS, HORA_INICIO_JORNADA, HORA_FIN_JORNADA, INTERVALO_CICLO_MINUTOS
+    global MAX_EMAILS_POR_DIA, MAX_WHATSAPP_POR_DIA
+
+    load_dotenv(BASE_DIR / ".env", override=True)
+    GMAIL_USER = os.getenv("GMAIL_USER", "")
+    GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
+    REMITENTE_NOMBRE = os.getenv("REMITENTE_NOMBRE", "Candidato")
+    REMITENTE_TELEFONO = os.getenv("REMITENTE_TELEFONO", "")
+    DIRECCION_RESIDENCIA = os.getenv("DIRECCION_RESIDENCIA", "San Miguel, El Salvador")
+    PRETENSION_SALARIAL = os.getenv("PRETENSION_SALARIAL", "450")
+    ULTIMO_SALARIO = os.getenv("ULTIMO_SALARIO", "380")
+    EDAD_POSTULANTE = os.getenv("EDAD_POSTULANTE", "21 años")
+    ESTADO_CIVIL_POSTULANTE = os.getenv("ESTADO_CIVIL_POSTULANTE", "Acompañado")
+    RESPUESTA_HIJOS = os.getenv("RESPUESTA_HIJOS", "Sí, esperando una hija próximamente.")
+    POSEE_LICENCIA_VEHICULO = os.getenv("POSEE_LICENCIA_VEHICULO", "NO")
+    ESTUDIA_ACTUALMENTE = os.getenv("ESTUDIA_ACTUALMENTE", "NO")
+    NIVEL_ACADEMICO = os.getenv(
+        "NIVEL_ACADEMICO",
+        "Egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE) y Bachiller Técnico en Software.",
+    )
+    RESUMEN_EXPERIENCIA_CV = os.getenv(
+        "RESUMEN_EXPERIENCIA_CV",
+        "Más de 2 años de experiencia comprobada en atención al cliente, manejo y cuadre de caja chica, facturación, control físico de inventarios en bodega y recepción de proveedores, más labores operativas.",
+    )
+    CARTA_PRESENTACION = os.getenv(
+        "CARTA_PRESENTACION",
+        "Buen día. Pongo a su disposición mi CV para la vacante. Cuento con más de 2 años de experiencia en asistencia administrativa, atención al cliente, manejo de caja chica, facturación y control físico de inventarios, además de experiencia operativa en bodega y formación técnica. Resido en la zona y tengo disponibilidad inmediata. Saludos cordiales.",
+    )
+    MOTIVO_SALIDA_ULTIMO_EMPLEO = os.getenv(
+        "MOTIVO_SALIDA_ULTIMO_EMPLEO",
+        "Búsqueda de superación profesional y estabilidad laboral a largo plazo.",
+    )
+    AREAS_ACTIVA_STR = os.getenv(
+        "AREAS_ACTIVAS",
+        "administrativo_atencion,logistica_operaciones,ventas_comercial,soporte_sistemas,programacion_software",
+    )
+    AREAS_ACTIVAS = [a.strip() for a in AREAS_ACTIVA_STR.split(",") if a.strip()]
+    CV_PATH = Path(os.getenv("CV_PATH", str(BASE_DIR / "cv_postulante.pdf"))).resolve()
+    AUTO_POSTULAR_PORTAL = os.getenv("AUTO_POSTULAR_PORTAL", "True").strip().lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+    UBICACION_OBJETIVO = os.getenv("UBICACION_OBJETIVO", "San Miguel")
+    PAGINAS_MAXIMAS = int(os.getenv("PAGINAS_MAXIMAS", "8"))
+    HEADLESS_SCRAPER = os.getenv("HEADLESS_SCRAPER", "False").strip().lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+    PALABRAS_EXCLUIDAS = [
+        palabra.strip().lower()
+        for palabra in os.getenv("PALABRAS_EXCLUIDAS", _EXCLUIDAS_DEFAULT).split(",")
+        if palabra.strip()
+    ]
+    HORA_INICIO_JORNADA = int(os.getenv("HORA_INICIO_JORNADA", "7"))
+    HORA_FIN_JORNADA = int(os.getenv("HORA_FIN_JORNADA", "16"))
+    INTERVALO_CICLO_MINUTOS = int(os.getenv("INTERVALO_CICLO_MINUTOS", "45"))
+    MAX_EMAILS_POR_DIA = int(os.getenv("MAX_EMAILS_POR_DIA", "12"))
+    MAX_WHATSAPP_POR_DIA = int(os.getenv("MAX_WHATSAPP_POR_DIA", "6"))
+
+
+def guardar_variables_env(nuevos_valores: dict[str, str]) -> None:
+    """
+    Actualiza o inserta pares CLAVE=VALOR dentro del archivo .env preservando comentarios,
+    y recarga la configuración en memoria inmediatamente.
+    """
+    env_path = BASE_DIR / ".env"
+    lineas_existentes: list[str] = []
+    if env_path.exists():
+        lineas_existentes = env_path.read_text(encoding="utf-8").splitlines()
+
+    claves_actualizadas: set[str] = set()
+    nuevas_lineas: list[str] = []
+
+    for linea in lineas_existentes:
+        linea_strip = linea.strip()
+        if not linea_strip or linea_strip.startswith("#") or "=" not in linea:
+            nuevas_lineas.append(linea)
+            continue
+        clave, _ = linea.split("=", 1)
+        clave_limpia = clave.strip()
+        if clave_limpia in nuevos_valores:
+            valor_limpio = str(nuevos_valores[clave_limpia]).replace("\n", " ").replace("\r", "").strip()
+            nuevas_lineas.append(f"{clave_limpia}={valor_limpio}")
+            claves_actualizadas.add(clave_limpia)
+        else:
+            nuevas_lineas.append(linea)
+
+    for clave, valor in nuevos_valores.items():
+        if clave not in claves_actualizadas:
+            valor_limpio = str(valor).replace("\n", " ").replace("\r", "").strip()
+            nuevas_lineas.append(f"{clave}={valor_limpio}")
+
+    env_path.write_text("\n".join(nuevas_lineas) + "\n", encoding="utf-8")
+    recargar_configuracion()
+

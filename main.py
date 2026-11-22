@@ -376,13 +376,22 @@ def parsear_argumentos() -> argparse.Namespace:
         action="store_true",
         help="Prueba el filtro de CV y guardado de empresas con datos simulados sin enviar mensajes.",
     )
+    parser.add_argument(
+        "--gui",
+        action="store_true",
+        help="Abre la interfaz gráfica de escritorio para PC (CustomTkinter).",
+    )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parsear_argumentos()
 
-    if args.login_portales:
+    if args.gui:
+        from interfaz_pc import lanzar_interfaz_escritorio
+
+        lanzar_interfaz_escritorio()
+    elif args.login_portales:
         iniciar_sesion_portales()
     elif args.login_whatsapp:
         iniciar_sesion_whatsapp()

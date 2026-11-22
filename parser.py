@@ -8,12 +8,10 @@ import re
 import unicodedata
 from typing import Any
 
+import config
 from config import (
-    EDAD_POSTULANTE,
     GUIAS_PREPARACION_TECH,
-    PALABRAS_EXCLUIDAS,
     PERFIL_AFINIDAD_CV,
-    REMITENTE_TELEFONO,
 )
 
 # Patrón Regex para correos electrónicos válidos
@@ -120,7 +118,7 @@ def extraer_telefonos_sv(texto: str, solo_moviles: bool = False) -> list[str]:
     coincidencias = PATRON_TELEFONO_SV.findall(texto)
     telefonos_limpios: list[str] = []
     vistos: set[str] = set()
-    propio_digitos = re.sub(r"\D", "", REMITENTE_TELEFONO)
+    propio_digitos = re.sub(r"\D", "", config.REMITENTE_TELEFONO)
 
     for bloque_1, bloque_2 in coincidencias:
         if solo_moviles and not bloque_1.startswith(("6", "7")):
@@ -162,7 +160,9 @@ def es_oferta_excluida(
     Retorna (True, motivo) si debe descartarse, o (False, "") si es accesible.
     """
     lista_excluidas = (
-        palabras_excluidas if palabras_excluidas is not None else PALABRAS_EXCLUIDAS
+        palabras_excluidas
+        if palabras_excluidas is not None
+        else config.PALABRAS_EXCLUIDAS
     )
     texto_titulo_empresa = _quitar_acentos(f"{titulo} {empresa}")
 
@@ -216,9 +216,12 @@ def es_oferta_excluida(
         if re.search(rf"\b{re.escape(cargo_inaccesible)}\b", titulo_norm):
             return True, f"cargo o rubro excluido: '{cargo_inaccesible}'"
 
-    # Verificar que el TÍTULO o EMPRESA pertenezca explícitamente a al menos una de las 5 áreas del CV o franquicias permitidas
+    # Verificar que el TÍTULO o EMPRESA pertenezca explícitamente a al menos una de las áreas activas del usuario
     coincide_titulo_cv = False
-    for _area, palabras_area in PERFIL_AFINIDAD_CV.items():
+    areas_permitidas = config.AREAS_ACTIVAS or list(PERFIL_AFINIDAD_CV.keys())
+    for area, palabras_area in PERFIL_AFINIDAD_CV.items():
+        if area not in areas_permitidas:
+            continue
         for palabra in palabras_area:
             palabra_norm = _quitar_acentos(palabra)
             if re.search(rf"\b{re.escape(palabra_norm)}\b", texto_titulo_empresa):
@@ -228,21 +231,23 @@ def es_oferta_excluida(
             break
 
     if not coincide_titulo_cv:
-        return True, "el título del puesto no pertenece a tus áreas (Administración, Bodega/Logística, Atención/Caja/Ventas en local o Informática)"
+        return True, "el título del puesto no pertenece a tus áreas seleccionadas"
 
-    # Si ya tenemos la descripción completa, verificar que no exija licencia/vehículo ni 4+ años de experiencia
+    # Si ya tenemos la descripción completa, verificar que no exija licencia/vehículo (si el usuario no tiene) ni 4+ años de experiencia
     if descripcion:
         desc_norm = _quitar_acentos(descripcion)
-        match_licencia = PATRON_LICENCIA_O_VEHICULO.search(desc_norm)
-        if match_licencia:
-            return True, f"exige licencia de conducir o vehículo ({match_licencia.group(0)})"
+        posee_licencia = config.POSEE_LICENCIA_VEHICULO.strip().upper().startswith("S")
+        if not posee_licencia:
+            match_licencia = PATRON_LICENCIA_O_VEHICULO.search(desc_norm)
+            if match_licencia:
+                return True, f"exige licencia de conducir o vehículo ({match_licencia.group(0)})"
 
         match_exp = PATRON_EXPERIENCIA_EXCESIVA.search(desc_norm)
         if match_exp:
             return True, f"exige demasiados años de experiencia ({match_exp.group(0)})"
 
         # Verificar si la oferta exige una edad mínima mayor a la edad del postulante
-        edad_usuario_str = re.sub(r"\D", "", EDAD_POSTULANTE)
+        edad_usuario_str = re.sub(r"\D", "", config.EDAD_POSTULANTE)
         edad_usuario = int(edad_usuario_str) if edad_usuario_str else 21
         for match_edad in PATRON_EDAD_MINIMA.finditer(desc_norm):
             edad_min_str = match_edad.group(1) or match_edad.group(2)
@@ -272,9 +277,13 @@ def evaluar_afinidad_cv(titulo: str, descripcion: str = "") -> tuple[bool, str]:
     texto_completo = _quitar_acentos(f"{titulo} {descripcion}")
     titulo_norm = _quitar_acentos(titulo)
 
-    puntajes: dict[str, int] = {area: 0 for area in PERFIL_AFINIDAD_CV}
+    areas_permitidas = config.AREAS_ACTIVAS or list(PERFIL_AFINIDAD_CV.keys())
+    puntajes: dict[str, int] = {area: 0 for area in PERFIL_AFINIDAD_CV if area in areas_permitidas}
+    if not puntajes:
+        puntajes = {area: 0 for area in PERFIL_AFINIDAD_CV}
 
-    for area, palabras in PERFIL_AFINIDAD_CV.items():
+    for area in puntajes:
+        palabras = PERFIL_AFINIDAD_CV[area]
         for palabra in palabras:
             palabra_norm = _quitar_acentos(palabra)
             patron = rf"\b{re.escape(palabra_norm)}\b"

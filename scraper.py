@@ -19,22 +19,7 @@ from playwright.sync_api import (
     sync_playwright,
 )
 
-from config import (
-    AUTO_POSTULAR_PORTAL,
-    DIRECCION_RESIDENCIA,
-    EDAD_POSTULANTE,
-    ESTADO_CIVIL_POSTULANTE,
-    GMAIL_USER,
-    HEADLESS_SCRAPER,
-    MOTIVO_SALIDA_ULTIMO_EMPLEO,
-    PAGINAS_MAXIMAS,
-    PORTAL_SESSION_DIR,
-    PRETENSION_SALARIAL,
-    REMITENTE_NOMBRE,
-    REMITENTE_TELEFONO,
-    UBICACION_OBJETIVO,
-    ULTIMO_SALARIO,
-)
+import config
 from database import existe_vacante, registrar_oferta_descartada
 from parser import es_oferta_excluida
 
@@ -117,7 +102,7 @@ def extraer_texto_completo_oferta(pagina: Page, selector_detalle: str) -> str:
 def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
     """
     Analiza cualquier pregunta de selección de Computrabajo y devuelve la respuesta
-    exacta basada en el CV y los datos del candidato en .env.
+    exacta basada en el CV y los datos del candidato en config/.env.
     """
     q = pregunta_raw.lower()
 
@@ -125,8 +110,8 @@ def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
     if any(p in q for p in ("último salario", "ultimo salario", "salario anterior", "cuánto ganaba", "cuanto ganaba")):
         return {
             "si_no": "si",
-            "numero": ULTIMO_SALARIO,
-            "texto": f"${ULTIMO_SALARIO}",
+            "numero": config.ULTIMO_SALARIO,
+            "texto": f"${config.ULTIMO_SALARIO}",
         }
 
     if any(
@@ -145,8 +130,8 @@ def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
     ):
         return {
             "si_no": "si",
-            "numero": PRETENSION_SALARIAL,
-            "texto": PRETENSION_SALARIAL,
+            "numero": config.PRETENSION_SALARIAL,
+            "texto": config.PRETENSION_SALARIAL,
         }
 
     # 2. Teléfono / WhatsApp / Celular de contacto
@@ -165,8 +150,8 @@ def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
     ):
         return {
             "si_no": "si",
-            "numero": re.sub(r"\D", "", REMITENTE_TELEFONO)[-8:] or "00000000",
-            "texto": REMITENTE_TELEFONO,
+            "numero": re.sub(r"\D", "", config.REMITENTE_TELEFONO)[-8:] or "00000000",
+            "texto": config.REMITENTE_TELEFONO,
         }
 
     # 3. Dirección exacta de residencia / domicilio / colonia
@@ -187,15 +172,16 @@ def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
         return {
             "si_no": "si",
             "numero": "1",
-            "texto": DIRECCION_RESIDENCIA,
+            "texto": config.DIRECCION_RESIDENCIA,
         }
 
-    # 4. ¿Reside en San Miguel?
-    if "san miguel" in q or "reside" in q or "vivir" in q or "zona oriental" in q:
+    # 4. ¿Reside en la ubicación objetivo?
+    ciudad_obj = config.UBICACION_OBJETIVO.lower()
+    if ciudad_obj in q or "san miguel" in q or "reside" in q or "vivir" in q or "zona oriental" in q:
         return {
             "si_no": "si",
             "numero": "1",
-            "texto": f"Sí, resido en {DIRECCION_RESIDENCIA}.",
+            "texto": f"Sí, resido en {config.DIRECCION_RESIDENCIA}.",
         }
 
     # 5. Correo electrónico
@@ -203,16 +189,16 @@ def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
         return {
             "si_no": "si",
             "numero": "1",
-            "texto": GMAIL_USER,
+            "texto": config.GMAIL_USER,
         }
 
     # 6. Edad / Fecha de nacimiento
     if any(p in q for p in ("edad", "cuántos años tiene", "cuantos años tiene", "fecha de nacimiento")):
-        solo_num_edad = re.sub(r"\D", "", EDAD_POSTULANTE) or "21"
+        solo_num_edad = re.sub(r"\D", "", config.EDAD_POSTULANTE) or "21"
         return {
             "si_no": "si",
             "numero": solo_num_edad,
-            "texto": EDAD_POSTULANTE,
+            "texto": config.EDAD_POSTULANTE,
         }
 
     # 7. Estado civil y/o Hijos (distinguiendo si pregunta ambos, solo hijos o solo estado civil)
@@ -223,24 +209,26 @@ def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
         p in q for p in ("estado civil", "casado", "soltero", "acompañado", "conyugal")
     )
 
+    tiene_hijos_si = not config.RESPUESTA_HIJOS.strip().lower().startswith("no")
     if pregunta_estado_civil and pregunta_hijos:
         return {
-            "si_no": "si",
-            "numero": "1",
-            "texto": f"{ESTADO_CIVIL_POSTULANTE} (en unión libre), esperando una hija.",
+            "si_no": "si" if tiene_hijos_si else "no",
+            "numero": "1" if tiene_hijos_si else "0",
+            "texto": f"{config.ESTADO_CIVIL_POSTULANTE}. {config.RESPUESTA_HIJOS}",
         }
     if pregunta_hijos:
         return {
-            "si_no": "si",
-            "numero": "1",
-            "texto": "Sí, esperando una hija próximamente.",
+            "si_no": "si" if tiene_hijos_si else "no",
+            "numero": "1" if tiene_hijos_si else "0",
+            "texto": config.RESPUESTA_HIJOS,
         }
     if pregunta_estado_civil:
         es_pregunta_casado_directa = "casado" in q and "estado civil" not in q
+        es_casado_usuario = "casad" in config.ESTADO_CIVIL_POSTULANTE.lower()
         return {
-            "si_no": "no" if es_pregunta_casado_directa else "si",
+            "si_no": ("si" if es_casado_usuario else "no") if es_pregunta_casado_directa else "si",
             "numero": "1",
-            "texto": f"{ESTADO_CIVIL_POSTULANTE} (en unión libre).",
+            "texto": config.ESTADO_CIVIL_POSTULANTE,
         }
 
     # 8. Motivo de salida / retiro de su último empleo
@@ -248,7 +236,7 @@ def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
         return {
             "si_no": "si",
             "numero": "1",
-            "texto": MOTIVO_SALIDA_ULTIMO_EMPLEO,
+            "texto": config.MOTIVO_SALIDA_ULTIMO_EMPLEO,
         }
 
     # 9. Antecedentes penales / Solvencia PNC / DUI / NIT / Documentos en regla
@@ -261,26 +249,41 @@ def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
 
     # 10. Cómo se transporta / Medio de transporte
     if any(p in q for p in ("cómo se transporta", "como se transporta", "medio de transporte", "traslada", "desplaza")):
+        posee_lic = config.POSEE_LICENCIA_VEHICULO.strip().upper().startswith("S")
         return {
             "si_no": "si",
             "numero": "1",
-            "texto": "Me traslado puntualmente en transporte urbano/público dentro de San Miguel.",
+            "texto": (
+                f"Me traslado en vehículo propio dentro de {config.UBICACION_OBJETIVO}."
+                if posee_lic
+                else f"Me traslado puntualmente en transporte urbano/público dentro de {config.UBICACION_OBJETIVO}."
+            ),
         }
 
     # 11. Preguntas sobre licencia o vehículo/moto
     if any(p in q for p in ("licencia", "motocicleta", "moto", "vehículo", "vehiculo", "conducir", "manejar")):
+        posee_lic = config.POSEE_LICENCIA_VEHICULO.strip().upper().startswith("S")
         return {
-            "si_no": "no",
-            "numero": "0",
-            "texto": "No poseo licencia ni vehículo propio, pero resido en San Miguel con disponibilidad y puntualidad total.",
+            "si_no": "si" if posee_lic else "no",
+            "numero": "1" if posee_lic else "0",
+            "texto": (
+                "Sí, cuento con licencia de conducir vigente y movilidad propia."
+                if posee_lic
+                else f"No poseo licencia ni vehículo propio, pero resido en {config.UBICACION_OBJETIVO} con disponibilidad y puntualidad total."
+            ),
         }
 
     # 12. Preguntas sobre si estudia actualmente (horarios de clases)
     if any(p in q for p in ("estudia actualmente", "estudiando actualmente", "horario de estudio", "clases", "universidad actualmente")):
+        estudia_act = config.ESTUDIA_ACTUALMENTE.strip().upper().startswith("S")
         return {
-            "si_no": "no",
-            "numero": "0",
-            "texto": "No estudio actualmente; ya soy egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE), por lo que tengo disponibilidad completa de horario.",
+            "si_no": "si" if estudia_act else "no",
+            "numero": "1" if estudia_act else "0",
+            "texto": (
+                f"Sí, estudio actualmente ({config.NIVEL_ACADEMICO}), con horarios flexibles."
+                if estudia_act
+                else f"No estudio actualmente ({config.NIVEL_ACADEMICO}), por lo que tengo disponibilidad completa de horario."
+            ),
         }
 
     # 13. Disponibilidad inmediata / horarios / fines de semana / días festivos / turnos rotativos
@@ -296,7 +299,7 @@ def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
         return {
             "si_no": "si",
             "numero": "2",
-            "texto": "Sí, trabajé más de 2 años en Clínica Otorrinolaringológica Cliniciru (Hospital San Francisco, San Miguel) a cargo del inventario físico de insumos médicos, suministros, proveedores, caja chica y atención a pacientes.",
+            "texto": config.RESUMEN_EXPERIENCIA_CV,
         }
 
     # 15. Experiencia en caja, facturación, inventario, bodega, atención al cliente, ventas o administración
@@ -323,7 +326,7 @@ def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
         return {
             "si_no": "si",
             "numero": "2",
-            "texto": "Sí, cuento con más de 2 años de experiencia comprobada en atención al cliente, manejo y cuadre de caja chica, facturación, control físico de inventarios en bodega y recepción de proveedores, más labores operativas de carga.",
+            "texto": f"Sí, {config.RESUMEN_EXPERIENCIA_CV}",
         }
 
     # 16. Estudios, sistemas, computación, Excel, Office o inglés
@@ -331,14 +334,14 @@ def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
         return {
             "si_no": "si",
             "numero": "2",
-            "texto": "Egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE) y Bachiller Técnico en Software, con dominio de Excel/Ofimática, bases de datos SQL e inglés nivel A2.",
+            "texto": config.NIVEL_ACADEMICO,
         }
 
     # Respuesta general formal basada en el CV para cualquier otra pregunta abierta
     return {
         "si_no": "si",
         "numero": "2",
-        "texto": "Sí, cuento con más de 2 años de experiencia administrativa, de inventarios, caja y atención al cliente en San Miguel, con disponibilidad inmediata.",
+        "texto": f"Sí, {config.RESUMEN_EXPERIENCIA_CV} Disponibilidad inmediata en {config.UBICACION_OBJETIVO}.",
     }
 
 
@@ -484,20 +487,17 @@ def _rellenar_encuesta_y_carta_portal(pagina: Page, titulo_puesto: str) -> None:
             "input[placeholder*='título de la carta'], input[name*='CoverLetterTitle'], input[id*='CoverLetter']"
         )
         if input_titulo_carta and input_titulo_carta.is_visible():
-            input_titulo_carta.fill(f"Postulación a {titulo_puesto} - San Miguel")
+            input_titulo_carta.fill(f"Postulación a {titulo_puesto} - {config.UBICACION_OBJETIVO}")
 
         textarea_carta = pagina.query_selector(
             "textarea[placeholder*='cuerpo de la carta'], textarea[name*='CoverLetter'], textarea[id*='CoverLetter']"
         )
         if textarea_carta and textarea_carta.is_visible():
-            texto_carta = (
+            texto_carta = config.CARTA_PRESENTACION or (
                 f"Buen día. Pongo a su disposición mi CV para la vacante de {titulo_puesto}. "
-                "Cuento con más de 2 años de experiencia en asistencia administrativa, atención al cliente, "
-                "manejo de caja chica, facturación y control físico de inventarios, además de experiencia "
-                "operativa en bodega y formación como Técnico en Desarrollo de Software (ITCA FEPADE). "
-                "Resido en San Miguel y tengo disponibilidad inmediata. Saludos cordiales."
+                f"{config.RESUMEN_EXPERIENCIA_CV} Resido en {config.UBICACION_OBJETIVO} y tengo disponibilidad inmediata."
             )
-            textarea_carta.fill(texto_carta)
+            textarea_carta.fill(texto_carta[:1495])
 
         # 2. Responder preguntas abiertas (textarea o inputs de texto de encuesta)
         bloques_pregunta = pagina.query_selector_all(
@@ -556,7 +556,7 @@ def intentar_postular_en_portal(
     rellena automáticamente encuestas de filtrado o carta de presentación según el CV,
     y confirma el envío.
     """
-    if not AUTO_POSTULAR_PORTAL or nombre_portal != "Computrabajo":
+    if not config.AUTO_POSTULAR_PORTAL or nombre_portal != "Computrabajo":
         return "NO"
 
     try:
@@ -636,20 +636,36 @@ def _lanzar_contexto_persistente(p: Any, directorio: Any, headless: bool = False
         return p.chromium.launch_persistent_context(**opciones_comunes)
 
 
-def iniciar_sesion_portales() -> None:
+def _construir_url_busqueda(nombre_portal: str, pagina: int) -> str:
+    """Construye la URL de búsqueda del portal según la ciudad/departamento objetivo actual."""
+    ubicacion = (config.UBICACION_OBJETIVO or "San Miguel").strip()
+    slug_computrabajo = re.sub(r"[^a-z0-9]+", "-", ubicacion.lower()).strip("-") or "san-miguel"
+    slug_query = ubicacion.replace(" ", "+")
+    if nombre_portal == "Computrabajo":
+        return f"https://sv.computrabajo.com/empleos-en-{slug_computrabajo}?p={pagina}"
+    if nombre_portal == "Encuentra24":
+        return f"https://www.encuentra24.com/el-salvador-es/empleos-ofertas-de-trabajos?q={slug_query}&page={pagina}"
+    if nombre_portal == "Tecoloco":
+        return f"https://www.tecoloco.com.sv/empleos?keywords={slug_query}&Page={pagina}"
+    return PORTALES_CONFIG[nombre_portal]["url_busqueda"].format(pagina=pagina)
+
+
+def iniciar_sesion_portales(esperar_cierre_navegador: bool = False) -> None:
     """
     Abre el navegador con el perfil persistente (portal_session/) en Computrabajo
     para que el usuario inicie sesión una sola vez y quede guardada para las auto-postulaciones.
+    Si `esperar_cierre_navegador=True` (modo interfaz gráfica), espera hasta que el usuario
+    cierre la ventana del navegador en lugar de pedir ENTER en consola.
     """
-    PORTAL_SESSION_DIR.mkdir(parents=True, exist_ok=True)
+    config.PORTAL_SESSION_DIR.mkdir(parents=True, exist_ok=True)
     logger.info(
         "Abriendo navegador persistente en %s para iniciar sesión en Computrabajo...",
-        PORTAL_SESSION_DIR,
+        config.PORTAL_SESSION_DIR,
     )
     with sync_playwright() as p:
         try:
             contexto = _lanzar_contexto_persistente(
-                p, PORTAL_SESSION_DIR, headless=False
+                p, config.PORTAL_SESSION_DIR, headless=False
             )
         except Exception as exc:
             logger.error(
@@ -664,39 +680,60 @@ def iniciar_sesion_portales() -> None:
             "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
         )
         pagina.goto("https://sv.computrabajo.com/", wait_until="domcontentloaded")
-        print("\n" + "=" * 80)
-        print("1. Inicia sesión con tu cuenta en la ventana de Computrabajo que se acaba de abrir.")
-        print("   (Tip: Puedes entrar con tu correo y contraseña de Computrabajo o con Google).")
-        print("2. Cuando ya hayas iniciado sesión y veas tu perfil activo, vuelve aquí y presiona ENTER.")
-        print("=" * 80 + "\n")
-        try:
-            input("Presiona ENTER cuando hayas terminado de iniciar sesión...")
-        except EOFError:
-            time.sleep(30)
-        finally:
-            contexto.close()
-    logger.info("Sesión de Computrabajo guardada exitosamente en %s", PORTAL_SESSION_DIR)
+        if esperar_cierre_navegador:
+            logger.info(
+                "Inicia sesión en Computrabajo y cierra la ventana del navegador cuando termines para guardar tu sesión."
+            )
+            try:
+                while contexto.pages:
+                    time.sleep(1.0)
+            except Exception:
+                pass
+            finally:
+                try:
+                    contexto.close()
+                except Exception:
+                    pass
+        else:
+            print("\n" + "=" * 80)
+            print("1. Inicia sesión con tu cuenta en la ventana de Computrabajo que se acaba de abrir.")
+            print("   (Tip: Puedes entrar con tu correo y contraseña de Computrabajo o con Google).")
+            print("2. Cuando ya hayas iniciado sesión y veas tu perfil activo, vuelve aquí y presiona ENTER.")
+            print("=" * 80 + "\n")
+            try:
+                input("Presiona ENTER cuando hayas terminado de iniciar sesión...")
+            except EOFError:
+                time.sleep(30)
+            finally:
+                contexto.close()
+    logger.info("Sesión de Computrabajo guardada exitosamente en %s", config.PORTAL_SESSION_DIR)
 
 
 def ejecutar_scraping_todos_los_portales(
     portales: list[str] | None = None,
-    paginas_maximas: int = PAGINAS_MAXIMAS,
-    headless: bool = HEADLESS_SCRAPER,
+    paginas_maximas: int | None = None,
+    headless: bool | None = None,
 ) -> list[dict[str, Any]]:
     """
     Recorre todos los portales configurados usando una única sesión persistente de Playwright,
     saltando ofertas ya existentes en SQLite para máxima velocidad.
     """
+    config.recargar_configuracion()
+    if paginas_maximas is None:
+        paginas_maximas = config.PAGINAS_MAXIMAS
+    if headless is None:
+        headless = config.HEADLESS_SCRAPER
+
     lista_portales = portales or list(PORTALES_CONFIG.keys())
     todas_las_ofertas: list[dict[str, Any]] = []
     urls_vistas: set[str] = set()
 
-    PORTAL_SESSION_DIR.mkdir(parents=True, exist_ok=True)
+    config.PORTAL_SESSION_DIR.mkdir(parents=True, exist_ok=True)
 
     with sync_playwright() as p:
         try:
             contexto = _lanzar_contexto_persistente(
-                p, PORTAL_SESSION_DIR, headless=headless
+                p, config.PORTAL_SESSION_DIR, headless=headless
             )
         except Exception as exc:
             logger.error(
@@ -720,7 +757,7 @@ def ejecutar_scraping_todos_los_portales(
                 resumenes_ofertas: list[dict[str, str]] = []
 
                 for num_pagina in range(1, paginas_maximas + 1):
-                    url_listado = cfg["url_busqueda"].format(pagina=num_pagina)
+                    url_listado = _construir_url_busqueda(nombre_portal, num_pagina)
                     logger.info(
                         "[%s] Navegando a página %d: %s",
                         nombre_portal,
@@ -795,10 +832,10 @@ def ejecutar_scraping_todos_los_portales(
                         ubicacion_cruda = (
                             nodo_ubicacion.inner_text().strip()
                             if nodo_ubicacion
-                            else UBICACION_OBJETIVO
+                            else config.UBICACION_OBJETIVO
                         )
                         ubicacion = (
-                            UBICACION_OBJETIVO
+                            config.UBICACION_OBJETIVO
                             if re.fullmatch(r"\d+(?:[.,]\d+)?", ubicacion_cruda)
                             else ubicacion_cruda.replace("\n", " ").strip()
                         )
