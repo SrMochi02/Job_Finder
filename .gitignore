@@ -37,6 +37,7 @@ logs/
 # IDEs, compilaciones (.exe) y sistema operativo
 build/
 dist/
+release_windows/
 *.spec
 *.exe
 *.zip

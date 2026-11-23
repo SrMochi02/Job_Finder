@@ -16,30 +16,30 @@ else:
 
 load_dotenv(BASE_DIR / ".env")
 
-# Credenciales de Gmail y datos del remitente
+# Credenciales de Gmail y datos del remitente (se cargan desde el archivo .env local de cada usuario)
 GMAIL_USER: str = os.getenv("GMAIL_USER", "")
 GMAIL_APP_PASSWORD: str = os.getenv("GMAIL_APP_PASSWORD", "")
-REMITENTE_NOMBRE: str = os.getenv("REMITENTE_NOMBRE", "Candidato")
+REMITENTE_NOMBRE: str = os.getenv("REMITENTE_NOMBRE", "")
 REMITENTE_TELEFONO: str = os.getenv("REMITENTE_TELEFONO", "")
-DIRECCION_RESIDENCIA: str = os.getenv("DIRECCION_RESIDENCIA", "San Miguel, El Salvador")
+DIRECCION_RESIDENCIA: str = os.getenv("DIRECCION_RESIDENCIA", "")
 PRETENSION_SALARIAL: str = os.getenv("PRETENSION_SALARIAL", "450")
 ULTIMO_SALARIO: str = os.getenv("ULTIMO_SALARIO", "380")
-EDAD_POSTULANTE: str = os.getenv("EDAD_POSTULANTE", "21 años")
-ESTADO_CIVIL_POSTULANTE: str = os.getenv("ESTADO_CIVIL_POSTULANTE", "Acompañado")
-RESPUESTA_HIJOS: str = os.getenv("RESPUESTA_HIJOS", "Sí, esperando una hija próximamente.")
+EDAD_POSTULANTE: str = os.getenv("EDAD_POSTULANTE", "22")
+ESTADO_CIVIL_POSTULANTE: str = os.getenv("ESTADO_CIVIL_POSTULANTE", "Soltero(a)")
+RESPUESTA_HIJOS: str = os.getenv("RESPUESTA_HIJOS", "No tengo hijos")
 POSEE_LICENCIA_VEHICULO: str = os.getenv("POSEE_LICENCIA_VEHICULO", "NO")
 ESTUDIA_ACTUALMENTE: str = os.getenv("ESTUDIA_ACTUALMENTE", "NO")
 NIVEL_ACADEMICO: str = os.getenv(
     "NIVEL_ACADEMICO",
-    "Egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE) y Bachiller Técnico en Software.",
+    "Bachiller / Técnico Universitario",
 )
 RESUMEN_EXPERIENCIA_CV: str = os.getenv(
     "RESUMEN_EXPERIENCIA_CV",
-    "Más de 2 años de experiencia comprobada en atención al cliente, manejo y cuadre de caja chica, facturación, control físico de inventarios en bodega y recepción de proveedores, más labores operativas.",
+    "Experiencia en atención al cliente, manejo de caja, facturación y control de inventarios.",
 )
 CARTA_PRESENTACION: str = os.getenv(
     "CARTA_PRESENTACION",
-    "Buen día. Pongo a su disposición mi CV para la vacante. Cuento con más de 2 años de experiencia en asistencia administrativa, atención al cliente, manejo de caja chica, facturación y control físico de inventarios, además de experiencia operativa en bodega y formación técnica. Resido en la zona y tengo disponibilidad inmediata. Saludos cordiales.",
+    "Buen día. Pongo a su disposición mi CV para la vacante. Cuento con experiencia comprobada y disponibilidad inmediata. Saludos cordiales.",
 )
 MOTIVO_SALIDA_ULTIMO_EMPLEO: str = os.getenv(
     "MOTIVO_SALIDA_ULTIMO_EMPLEO",
@@ -250,27 +250,27 @@ def recargar_configuracion() -> None:
     load_dotenv(BASE_DIR / ".env", override=True)
     GMAIL_USER = os.getenv("GMAIL_USER", "")
     GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
-    REMITENTE_NOMBRE = os.getenv("REMITENTE_NOMBRE", "Candidato")
+    REMITENTE_NOMBRE = os.getenv("REMITENTE_NOMBRE", "")
     REMITENTE_TELEFONO = os.getenv("REMITENTE_TELEFONO", "")
-    DIRECCION_RESIDENCIA = os.getenv("DIRECCION_RESIDENCIA", "San Miguel, El Salvador")
+    DIRECCION_RESIDENCIA = os.getenv("DIRECCION_RESIDENCIA", "")
     PRETENSION_SALARIAL = os.getenv("PRETENSION_SALARIAL", "450")
     ULTIMO_SALARIO = os.getenv("ULTIMO_SALARIO", "380")
-    EDAD_POSTULANTE = os.getenv("EDAD_POSTULANTE", "21 años")
-    ESTADO_CIVIL_POSTULANTE = os.getenv("ESTADO_CIVIL_POSTULANTE", "Acompañado")
-    RESPUESTA_HIJOS = os.getenv("RESPUESTA_HIJOS", "Sí, esperando una hija próximamente.")
+    EDAD_POSTULANTE = os.getenv("EDAD_POSTULANTE", "22")
+    ESTADO_CIVIL_POSTULANTE = os.getenv("ESTADO_CIVIL_POSTULANTE", "Soltero(a)")
+    RESPUESTA_HIJOS = os.getenv("RESPUESTA_HIJOS", "No tengo hijos")
     POSEE_LICENCIA_VEHICULO = os.getenv("POSEE_LICENCIA_VEHICULO", "NO")
     ESTUDIA_ACTUALMENTE = os.getenv("ESTUDIA_ACTUALMENTE", "NO")
     NIVEL_ACADEMICO = os.getenv(
         "NIVEL_ACADEMICO",
-        "Egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE) y Bachiller Técnico en Software.",
+        "Bachiller / Técnico Universitario",
     )
     RESUMEN_EXPERIENCIA_CV = os.getenv(
         "RESUMEN_EXPERIENCIA_CV",
-        "Más de 2 años de experiencia comprobada en atención al cliente, manejo y cuadre de caja chica, facturación, control físico de inventarios en bodega y recepción de proveedores, más labores operativas.",
+        "Experiencia en atención al cliente, manejo de caja, facturación y control de inventarios.",
     )
     CARTA_PRESENTACION = os.getenv(
         "CARTA_PRESENTACION",
-        "Buen día. Pongo a su disposición mi CV para la vacante. Cuento con más de 2 años de experiencia en asistencia administrativa, atención al cliente, manejo de caja chica, facturación y control físico de inventarios, además de experiencia operativa en bodega y formación técnica. Resido en la zona y tengo disponibilidad inmediata. Saludos cordiales.",
+        "Buen día. Pongo a su disposición mi CV para la vacante. Cuento con experiencia comprobada y disponibilidad inmediata. Saludos cordiales.",
     )
     MOTIVO_SALIDA_ULTIMO_EMPLEO = os.getenv(
         "MOTIVO_SALIDA_ULTIMO_EMPLEO",

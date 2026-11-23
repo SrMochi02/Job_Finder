@@ -57,9 +57,16 @@ echo pause
 ) > "dist\JobFinderPC\Instalar_Acceso_Directo.bat"
 
 echo.
-echo [3/3] Limpiando carpeta temporal 'build' y empaquetando archivo distribuible ZIP...
+echo [3/3] Limpiando archivos temporales y empaquetando archivo distribuible ZIP (100%% libre de datos personales)...
 if exist "build" rmdir /S /Q "build"
 if exist "JobFinderPC.spec" del /F /Q "JobFinderPC.spec"
+if exist "dist\JobFinderPC\.env" del /F /Q "dist\JobFinderPC\.env"
+if exist "dist\JobFinderPC\*.pdf" del /F /Q "dist\JobFinderPC\*.pdf"
+if exist "dist\JobFinderPC\*.db" del /F /Q "dist\JobFinderPC\*.db"
+if exist "dist\JobFinderPC\*.csv" del /F /Q "dist\JobFinderPC\*.csv"
+if exist "dist\JobFinderPC\*.log" del /F /Q "dist\JobFinderPC\*.log"
+if exist "dist\JobFinderPC\portal_session" rmdir /S /Q "dist\JobFinderPC\portal_session"
+if exist "dist\JobFinderPC\whatsapp_session" rmdir /S /Q "dist\JobFinderPC\whatsapp_session"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path 'dist\JobFinderPC_Windows10_11.zip') { Remove-Item 'dist\JobFinderPC_Windows10_11.zip' -Force }; Compress-Archive -Path 'dist\JobFinderPC\*' -DestinationPath 'dist\JobFinderPC_Windows10_11.zip' -Force"
 
 echo.
