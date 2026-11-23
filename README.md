@@ -51,5 +51,5 @@ venv\Scripts\python interfaz_pc.py
 
 Para volver a generar el ejecutable `.exe` y el paquete `.zip` para Windows 10/11:
 ```bat
-crear_ejecutable_windows.bat
+scripts\crear_ejecutable_windows.bat
 ```

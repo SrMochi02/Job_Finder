@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 title Job Finder San Miguel - Jornada Continua (7:00 AM a 4:00 PM)
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 echo ============================================================================
 echo   INICIANDO JOB FINDER - SAN MIGUEL (JORNADA AUTOMATICA 7:00 AM - 4:00 PM)
