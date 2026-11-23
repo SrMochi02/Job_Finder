@@ -34,7 +34,12 @@ __pycache__/
 *.log
 logs/
 
-# IDEs y sistema operativo
+# IDEs, compilaciones (.exe) y sistema operativo
+build/
+dist/
+*.spec
+*.exe
+*.zip
 .vscode/
 .idea/
 Thumbs.db

@@ -155,10 +155,12 @@ def _lanzar_contexto_whatsapp(p: Any, directorio_sesion: Path) -> Any:
             "--no-default-browser-check",
         ],
     }
-    try:
-        return p.chromium.launch_persistent_context(channel="chrome", **opciones)
-    except Exception:
-        return p.chromium.launch_persistent_context(**opciones)
+    for canal in ("chrome", "msedge"):
+        try:
+            return p.chromium.launch_persistent_context(channel=canal, **opciones)
+        except Exception:
+            continue
+    return p.chromium.launch_persistent_context(**opciones)
 
 
 def iniciar_sesion_whatsapp(

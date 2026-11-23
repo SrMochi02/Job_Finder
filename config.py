@@ -4,11 +4,16 @@ Carga las variables desde el archivo .env de forma aislada y segura.
 """
 
 import os
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Cargar variables de entorno desde el archivo .env
-BASE_DIR = Path(__file__).resolve().parent
+# Directorio base compatible tanto en código fuente como en ejecutable (.exe de PyInstaller)
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(sys.executable).resolve().parent
+else:
+    BASE_DIR = Path(__file__).resolve().parent
+
 load_dotenv(BASE_DIR / ".env")
 
 # Credenciales de Gmail y datos del remitente

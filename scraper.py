@@ -630,10 +630,12 @@ def _lanzar_contexto_persistente(p: Any, directorio: Any, headless: bool = False
             "Chrome/131.0.0.0 Safari/537.36"
         ),
     }
-    try:
-        return p.chromium.launch_persistent_context(channel="chrome", **opciones_comunes)
-    except Exception:
-        return p.chromium.launch_persistent_context(**opciones_comunes)
+    for canal in ("chrome", "msedge"):
+        try:
+            return p.chromium.launch_persistent_context(channel=canal, **opciones_comunes)
+        except Exception:
+            continue
+    return p.chromium.launch_persistent_context(**opciones_comunes)
 
 
 def _construir_url_busqueda(nombre_portal: str, pagina: int) -> str:
