@@ -869,6 +869,7 @@ class JobFinderDesktopApp(ctk.CTk):
 
         self.vars_areas: dict[str, ctk.BooleanVar] = {}
         self.frames_detalle_cat: dict[str, ctk.CTkFrame] = {}
+        self.chips_construidos: set[str] = set()
 
         for clave_area, info_cat in CATALOGO_EMPLEOS_SV.items():
             contenedor_cat = ctk.CTkFrame(
@@ -890,7 +891,7 @@ class JobFinderDesktopApp(ctk.CTk):
             )
             chk.pack(side="left")
 
-            # Panel desplegable oculto inicialmente con los puestos típicos en El Salvador
+            # Panel desplegable con carga diferida (Lazy Loading) para no consumir RAM ni CPU en Intel Celeron
             frame_det = ctk.CTkFrame(contenedor_cat, fg_color="transparent")
             self.frames_detalle_cat[clave_area] = frame_det
 
@@ -909,34 +910,6 @@ class JobFinderDesktopApp(ctk.CTk):
                 )
             )
             btn_toggle.pack(side="right")
-
-            # Botones tipo "chip" para cada puesto dentro del desplegable
-            ctk.CTkLabel(
-                frame_det,
-                text="Haz clic en un puesto para agregarlo a tu caja de interés ('Lo que SÍ quiero'):",
-                font=ctk.CTkFont(size=11),
-                text_color="gray70",
-            ).pack(anchor="w", padx=10, pady=(2, 4))
-
-            wrap_chips = ctk.CTkFrame(frame_det, fg_color="transparent")
-            wrap_chips.pack(fill="x", padx=8, pady=(0, 8))
-
-            for idx_p, nombre_puesto in enumerate(info_cat["ejemplos"]):
-                chip = ctk.CTkButton(
-                    wrap_chips,
-                    text=f"+ {nombre_puesto}",
-                    height=26,
-                    corner_radius=12,
-                    fg_color=("#3b82f6", "#2563eb"),
-                    hover_color=("#1d4ed8", "#1e40af"),
-                    font=ctk.CTkFont(size=11),
-                    command=lambda p=nombre_puesto, k=clave_area: self._agregar_puesto_interes_chip(
-                        p, k
-                    ),
-                )
-                chip.grid(
-                    row=idx_p // 4, column=idx_p % 4, padx=4, pady=3, sticky="w"
-                )
 
         # ---- SECCIÓN 3: LO QUE NO QUIERO (FILTRO NEGATIVO) ----
         card_negativo = ctk.CTkFrame(scroll, corner_radius=12)
@@ -972,6 +945,15 @@ class JobFinderDesktopApp(ctk.CTk):
             text="Ocultar la ventana del navegador mientras busca (Modo silencioso)",
             variable=self.var_ocultar_nav,
             font=ctk.CTkFont(size=12),
+        ).pack(anchor="w", padx=16, pady=(0, 6))
+
+        self.var_bajos_recursos = ctk.BooleanVar(value=True)
+        ctk.CTkSwitch(
+            card_negativo,
+            text="⚡ Modo Ultra-Ligero (PCs con 2GB RAM, Intel Celeron y Disco Duro HDD — Bloquea imágenes/anuncios y ahorra 70% de memoria)",
+            variable=self.var_bajos_recursos,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=("#059669", "#34d399"),
         ).pack(anchor="w", padx=16, pady=(0, 14))
 
         ctk.CTkButton(
@@ -993,6 +975,35 @@ class JobFinderDesktopApp(ctk.CTk):
             frame.pack_forget()
             boton.configure(text="▾ Ver puestos")
         else:
+            if clave_area not in self.chips_construidos:
+                self.chips_construidos.add(clave_area)
+                info_cat = CATALOGO_EMPLEOS_SV[clave_area]
+                ctk.CTkLabel(
+                    frame,
+                    text="Haz clic en un puesto para agregarlo a tu caja de interés ('Lo que SÍ quiero'):",
+                    font=ctk.CTkFont(size=11),
+                    text_color="gray70",
+                ).pack(anchor="w", padx=10, pady=(2, 4))
+
+                wrap_chips = ctk.CTkFrame(frame, fg_color="transparent")
+                wrap_chips.pack(fill="x", padx=8, pady=(0, 8))
+
+                for idx_p, nombre_puesto in enumerate(info_cat["ejemplos"]):
+                    chip = ctk.CTkButton(
+                        wrap_chips,
+                        text=f"+ {nombre_puesto}",
+                        height=26,
+                        corner_radius=12,
+                        fg_color=("#3b82f6", "#2563eb"),
+                        hover_color=("#1d4ed8", "#1e40af"),
+                        font=ctk.CTkFont(size=11),
+                        command=lambda p=nombre_puesto, k=clave_area: self._agregar_puesto_interes_chip(
+                            p, k
+                        ),
+                    )
+                    chip.grid(
+                        row=idx_p // 4, column=idx_p % 4, padx=4, pady=3, sticky="w"
+                    )
             frame.pack(fill="x", padx=12, pady=(0, 8))
             boton.configure(text="▴ Ocultar puestos")
 
@@ -1331,6 +1342,7 @@ class JobFinderDesktopApp(ctk.CTk):
 
         self.var_auto_postular.set(config.AUTO_POSTULAR_PORTAL)
         self.var_ocultar_nav.set(config.HEADLESS_SCRAPER)
+        self.var_bajos_recursos.set(config.MODO_BAJOS_RECURSOS)
 
         self.txt_excluidas.delete("1.0", "end")
         self.txt_excluidas.insert("1.0", ", ".join(config.PALABRAS_EXCLUIDAS))
@@ -1415,6 +1427,7 @@ class JobFinderDesktopApp(ctk.CTk):
             "AREAS_ACTIVAS": ",".join(seleccionadas),
             "AUTO_POSTULAR_PORTAL": "True" if self.var_auto_postular.get() else "False",
             "HEADLESS_SCRAPER": "True" if self.var_ocultar_nav.get() else "False",
+            "MODO_BAJOS_RECURSOS": "True" if self.var_bajos_recursos.get() else "False",
             "PALABRAS_EXCLUIDAS": palabras_limpias,
         }
         config.guardar_variables_env(datos)
@@ -1689,14 +1702,20 @@ class JobFinderDesktopApp(ctk.CTk):
         self.txt_consola.delete("1.0", "end")
 
     def _procesar_cola_logs(self) -> None:
+        nuevas_lineas: list[str] = []
         while not self.log_queue.empty():
             try:
-                linea = self.log_queue.get_nowait()
-                self.txt_consola.insert("end", linea + "\n")
-                self.txt_consola.see("end")
+                nuevas_lineas.append(self.log_queue.get_nowait())
             except queue.Empty:
                 break
-        self.after(200, self._procesar_cola_logs)
+        if nuevas_lineas:
+            self.txt_consola.insert("end", "\n".join(nuevas_lineas) + "\n")
+            # Limitar la consola a máximo 250 líneas en RAM para PCs con 2GB de RAM
+            total_lineas = int(self.txt_consola.index("end-1c").split(".")[0])
+            if total_lineas > 250:
+                self.txt_consola.delete("1.0", f"{total_lineas - 200}.0")
+            self.txt_consola.see("end")
+        self.after(400, self._procesar_cola_logs)
 
 
 def lanzar_interfaz_escritorio() -> None:

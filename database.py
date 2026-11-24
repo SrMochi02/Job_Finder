@@ -30,10 +30,20 @@ COLUMNAS_ADICIONALES_VACANTES: dict[str, str] = {
 
 
 def obtener_conexion(db_path: Path = DB_PATH) -> sqlite3.Connection:
-    """Crea y retorna una conexión SQLite con soporte para llaves foráneas y filas tipo dict."""
-    conn = sqlite3.connect(str(db_path))
+    """
+    Crea y retorna una conexión SQLite optimizada para discos duros mecánicos (HDD)
+    y equipos de bajos recursos (2GB RAM / Intel Celeron):
+    - journal_mode = WAL (reduce bloqueos y escrituras físicas en HDD).
+    - synchronous = NORMAL (ahorra ciclos de espera de cabezal en HDD sin perder integridad).
+    - temp_store = MEMORY y cache_size moderado (-4000 = ~4MB RAM).
+    """
+    conn = sqlite3.connect(str(db_path), timeout=20.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA synchronous = NORMAL;")
+    conn.execute("PRAGMA temp_store = MEMORY;")
+    conn.execute("PRAGMA cache_size = -4000;")
     return conn
 
 

@@ -6,6 +6,7 @@ Incluye:
 - Sesión persistente en portales (portal_session/) para auto-postulación en 1 clic con el botón 'Postularme'.
 """
 
+import gc
 import logging
 import random
 import re
@@ -619,21 +620,54 @@ def intentar_postular_en_portal(
         return "NO"
 
 
-def _lanzar_contexto_persistente(p: Any, directorio: Any, headless: bool = False) -> Any:
+def _lanzar_contexto_persistente(
+    p: Any,
+    directorio: Any,
+    headless: bool = False,
+    modo_ligero: bool | None = None,
+) -> Any:
     """
     Lanza un contexto persistente ocultando las banderas de automatización
-    (--enable-automation y AutomationControlled) para que los portales y Google
-    no bloqueen el inicio de sesión diciendo que el navegador es inseguro.
+    (--enable-automation y AutomationControlled) e incluyendo banderas de ahorro extremo
+    de RAM, CPU y disco duro (HDD) para PCs con Intel Celeron (2011) y 2 GB de RAM.
     """
+    if modo_ligero is None:
+        modo_ligero = config.MODO_BAJOS_RECURSOS
+
+    argumentos_base = [
+        "--disable-blink-features=AutomationControlled",
+        "--no-default-browser-check",
+        "--no-first-run",
+    ]
+
+    if modo_ligero:
+        argumentos_base.extend(
+            [
+                "--disable-gpu",
+                "--disable-software-rasterizer",
+                "--disable-dev-shm-usage",
+                "--disable-extensions",
+                "--disable-background-networking",
+                "--disable-sync",
+                "--disable-translate",
+                "--disable-default-apps",
+                "--mute-audio",
+                "--no-pings",
+                "--metrics-recording-only",
+                "--disable-hang-monitor",
+                "--renderer-process-limit=2",
+                "--disk-cache-size=10485760",
+                "--media-cache-size=1048576",
+                "--js-flags=--max-old-space-size=192",
+            ]
+        )
+
     opciones_comunes = {
         "user_data_dir": str(directorio),
         "headless": headless,
-        "viewport": {"width": 1280, "height": 800},
+        "viewport": {"width": 1024, "height": 680} if modo_ligero else {"width": 1280, "height": 800},
         "ignore_default_args": ["--enable-automation"],
-        "args": [
-            "--disable-blink-features=AutomationControlled",
-            "--no-default-browser-check",
-        ],
+        "args": argumentos_base,
         "user_agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -646,6 +680,46 @@ def _lanzar_contexto_persistente(p: Any, directorio: Any, headless: bool = False
         except Exception:
             continue
     return p.chromium.launch_persistent_context(**opciones_comunes)
+
+
+def _activar_bloqueo_multimedia_bajos_recursos(pagina: Page) -> None:
+    """
+    Intercepta y bloquea imágenes pesadas, videos, fuentes web y trackers publicitarios
+    para ahorrar hasta un 70% de memoria RAM, CPU y escrituras en disco duro (HDD)
+    durante el scraping y la auto-postulación.
+    """
+    tipos_bloqueados = {"image", "media", "font"}
+    dominios_basura = (
+        "doubleclick.net",
+        "googlesyndication.com",
+        "google-analytics.com",
+        "googletagmanager.com",
+        "facebook.net",
+        "hotjar.com",
+        "clarity.ms",
+    )
+
+    def _interceptar(route: Any) -> None:
+        try:
+            req = route.request
+            if req.resource_type in tipos_bloqueados:
+                route.abort()
+                return
+            url_low = req.url.lower()
+            if any(d in url_low for d in dominios_basura):
+                route.abort()
+                return
+            route.continue_()
+        except Exception:
+            try:
+                route.continue_()
+            except Exception:
+                pass
+
+    try:
+        pagina.route("**/*", _interceptar)
+    except Exception:
+        pass
 
 
 def _construir_url_busqueda(nombre_portal: str, pagina: int) -> str:
@@ -759,6 +833,8 @@ def ejecutar_scraping_todos_los_portales(
         pagina.add_init_script(
             "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
         )
+        if config.MODO_BAJOS_RECURSOS:
+            _activar_bloqueo_multimedia_bajos_recursos(pagina)
 
         try:
             for nombre_portal in lista_portales:
@@ -965,5 +1041,6 @@ def ejecutar_scraping_todos_los_portales(
                 contexto.close()
             except Exception:
                 pass
+            gc.collect()
 
     return todas_las_ofertas

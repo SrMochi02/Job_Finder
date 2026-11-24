@@ -143,16 +143,25 @@ def enviar_whatsapp_en_pagina(
 
 
 def _lanzar_contexto_whatsapp(p: Any, directorio_sesion: Path) -> Any:
-    """Lanza el navegador persistente para WhatsApp Web con banderas limpias."""
+    """Lanza el navegador persistente para WhatsApp Web optimizado para bajo consumo de RAM y HDD."""
     directorio_sesion.mkdir(parents=True, exist_ok=True)
     opciones = {
         "user_data_dir": str(directorio_sesion),
         "headless": False,
-        "viewport": {"width": 1280, "height": 800},
+        "viewport": {"width": 1024, "height": 680},
         "ignore_default_args": ["--enable-automation"],
         "args": [
             "--disable-blink-features=AutomationControlled",
             "--no-default-browser-check",
+            "--no-first-run",
+            "--disable-gpu",
+            "--disable-dev-shm-usage",
+            "--disable-extensions",
+            "--disable-background-networking",
+            "--disable-sync",
+            "--mute-audio",
+            "--renderer-process-limit=2",
+            "--disk-cache-size=10485760",
         ],
     }
     for canal in ("chrome", "msedge"):

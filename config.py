@@ -93,10 +93,15 @@ AUTO_POSTULAR_PORTAL: bool = os.getenv("AUTO_POSTULAR_PORTAL", "True").strip().l
     "yes",
 )
 
-# Parámetros de scraping
+# Parámetros de scraping y Modo Ultra-Ligero (PCs con 2GB RAM, Intel Celeron, HDD)
 UBICACION_OBJETIVO: str = os.getenv("UBICACION_OBJETIVO", "San Miguel")
 PAGINAS_MAXIMAS: int = int(os.getenv("PAGINAS_MAXIMAS", "8"))
 HEADLESS_SCRAPER: bool = os.getenv("HEADLESS_SCRAPER", "False").strip().lower() in (
+    "true",
+    "1",
+    "yes",
+)
+MODO_BAJOS_RECURSOS: bool = os.getenv("MODO_BAJOS_RECURSOS", "True").strip().lower() in (
     "true",
     "1",
     "yes",
@@ -592,6 +597,7 @@ def recargar_configuracion() -> None:
     global RESUMEN_EXPERIENCIA_CV, CARTA_PRESENTACION
     global MOTIVO_SALIDA_ULTIMO_EMPLEO, AREAS_ACTIVA_STR, AREAS_ACTIVAS, CV_PATH
     global AUTO_POSTULAR_PORTAL, UBICACION_OBJETIVO, PAGINAS_MAXIMAS, HEADLESS_SCRAPER
+    global MODO_BAJOS_RECURSOS
     global PALABRAS_EXCLUIDAS, HORA_INICIO_JORNADA, HORA_FIN_JORNADA, INTERVALO_CICLO_MINUTOS
     global MAX_EMAILS_POR_DIA, MAX_WHATSAPP_POR_DIA
 
@@ -654,6 +660,11 @@ def recargar_configuracion() -> None:
     UBICACION_OBJETIVO = os.getenv("UBICACION_OBJETIVO", "San Miguel")
     PAGINAS_MAXIMAS = int(os.getenv("PAGINAS_MAXIMAS", "8"))
     HEADLESS_SCRAPER = os.getenv("HEADLESS_SCRAPER", "False").strip().lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+    MODO_BAJOS_RECURSOS = os.getenv("MODO_BAJOS_RECURSOS", "True").strip().lower() in (
         "true",
         "1",
         "yes",
