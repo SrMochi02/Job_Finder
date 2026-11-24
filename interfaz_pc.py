@@ -12,8 +12,10 @@ import logging
 import os
 import queue
 import shutil
+import sys
 import threading
 import time
+import traceback
 import webbrowser
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
@@ -35,7 +37,7 @@ from database import (
     obtener_directorio_empresas,
     registrar_respuesta_entrevista,
 )
-from mailer import enviar_correo_individual
+from mailer import enviar_correo_individual, enviar_reporte_error_diagnostico
 from main import ejecutar_flujo_completo
 from scraper import iniciar_sesion_portales
 from whatsapp import iniciar_sesion_whatsapp
@@ -116,7 +118,11 @@ class JobFinderDesktopApp(ctk.CTk):
         self.detener_evento = threading.Event()
         self.hilo_trabajo: threading.Thread | None = None
         self.botones_menu: dict[str, ctk.CTkButton] = {}
+        self.ultimo_error_titulo: str = "Sin errores registrados en esta sesión"
+        self.ultimo_error_traza: str = "No se ha detectado ningún fallo inesperado hasta el momento."
+        self.modal_error_abierto = False
 
+        self._instalar_capturador_errores()
         self._construir_layout_principal()
         self._cargar_valores_en_formularios()
         self._actualizar_estadisticas_y_tabla()
@@ -192,13 +198,27 @@ class JobFinderDesktopApp(ctk.CTk):
             justify="left",
         ).pack(padx=14, pady=(0, 12), anchor="w")
 
+        ctk.CTkButton(
+            self.sidebar,
+            text="🛠️ Reportar un Error / Diagnóstico",
+            height=34,
+            corner_radius=8,
+            fg_color=("#cbd5e1", "#374151"),
+            hover_color=("#94a3b8", "#4b5563"),
+            text_color=("#1e293b", "#f3f4f6"),
+            font=ctk.CTkFont(size=12, weight="bold"),
+            command=lambda: self._mostrar_ventana_reporte_error(
+                self.ultimo_error_titulo, self.ultimo_error_traza, es_manual=True
+            ),
+        ).grid(row=9, column=0, padx=14, pady=(2, 6), sticky="ew")
+
         self.menu_tema = ctk.CTkOptionMenu(
             self.sidebar,
             values=["🌙 Modo Oscuro", "☀️ Modo Claro"],
             command=self._cambiar_tema,
             height=34,
         )
-        self.menu_tema.grid(row=9, column=0, padx=14, pady=(4, 18), sticky="ew")
+        self.menu_tema.grid(row=10, column=0, padx=14, pady=(2, 18), sticky="ew")
         self.menu_tema.set("🌙 Modo Oscuro")
 
         # ================== CONTENEDOR PRINCIPAL ==================
@@ -454,7 +474,7 @@ class JobFinderDesktopApp(ctk.CTk):
         ).grid(row=1, column=0, columnspan=2, padx=16, pady=(0, 10), sticky="w")
 
         self.ent_nombre = self._crear_campo(
-            card_personal, 2, 0, "Tu Nombre Completo:", "Ejemplo: Raúl Hernández"
+            card_personal, 2, 0, "Tu Nombre Completo:", "Ejemplo: Juan Carlos Pérez"
         )
         self.ent_telefono = self._crear_campo(
             card_personal, 2, 1, "Tu Celular / WhatsApp:", "Ejemplo: +503 7000-0000"
@@ -464,28 +484,28 @@ class JobFinderDesktopApp(ctk.CTk):
             3,
             0,
             "Tu Edad Actual (filtra ofertas que pidan mayor edad):",
-            "Ejemplo: 21 años",
+            "Ejemplo: 25 años",
         )
         self.ent_direccion = self._crear_campo(
             card_personal,
             3,
             1,
             "Tu Dirección o Colonia donde vives:",
-            "Ejemplo: Residencial La Pradera, San Miguel",
+            "Ejemplo: Colonia Escalón, San Salvador",
         )
         self.ent_pretension = self._crear_campo(
             card_personal,
             4,
             0,
             "¿Cuánto deseas ganar al mes? (USD - solo número):",
-            "Ejemplo: 450",
+            "Ejemplo: 500",
         )
         self.ent_ultimo_salario = self._crear_campo(
             card_personal,
             4,
             1,
             "¿Cuánto ganabas en tu último empleo? (USD - solo número):",
-            "Ejemplo: 380",
+            "Ejemplo: 400",
         )
 
         frame_ec = ctk.CTkFrame(card_personal, fg_color="transparent")
@@ -505,7 +525,7 @@ class JobFinderDesktopApp(ctk.CTk):
             5,
             1,
             "Si preguntan '¿Tiene hijos?', ¿qué responder?:",
-            "Ejemplo: No tengo hijos  /  Sí, esperando una hija",
+            "Ejemplo: No tengo hijos  /  Sí, 1 hijo",
         )
 
         frame_lic = ctk.CTkFrame(card_personal, fg_color="transparent")
@@ -530,7 +550,7 @@ class JobFinderDesktopApp(ctk.CTk):
             6,
             1,
             "Motivo de salida de tu último trabajo:",
-            "Ejemplo: Finalización de proyecto y superación profesional",
+            "Ejemplo: Búsqueda de crecimiento profesional",
         )
 
         # ---- TARJETA 3: NIVEL ACADÉMICO Y FILTRO DE ESTUDIOS ----
@@ -580,7 +600,7 @@ class JobFinderDesktopApp(ctk.CTk):
             2,
             0,
             "Nombre de tu Carrera o Título obtenido (para responder en encuestas):",
-            "Ejemplo: Egresado de Técnico en Desarrollo de Software (ITCA) y Bachiller",
+            "Ejemplo: Bachiller General / Técnico en Administración",
         )
         self.ent_nivel_academico.master.grid_configure(columnspan=2)
 
@@ -1543,7 +1563,9 @@ class JobFinderDesktopApp(ctk.CTk):
                 config.recargar_configuracion()
                 ejecutar_flujo_completo(respetar_horario=False)
             except Exception as exc:
-                logging.getLogger("gui").error("Ocurrió un error: %s", exc)
+                traza = traceback.format_exc()
+                logging.getLogger("gui").error("Ocurrió un error inesperado: %s", exc)
+                self._registrar_y_notificar_error(str(exc), traza)
             finally:
                 self.after(0, self._finalizar_ejecucion_ui)
 
@@ -1572,7 +1594,9 @@ class JobFinderDesktopApp(ctk.CTk):
                             break
                         time.sleep(1)
             except Exception as exc:
-                logging.getLogger("gui").error("Ocurrió un error: %s", exc)
+                traza = traceback.format_exc()
+                logging.getLogger("gui").error("Ocurrió un error inesperado: %s", exc)
+                self._registrar_y_notificar_error(str(exc), traza)
             finally:
                 self.after(0, self._finalizar_ejecucion_ui)
 
@@ -1716,6 +1740,180 @@ class JobFinderDesktopApp(ctk.CTk):
                 self.txt_consola.delete("1.0", f"{total_lineas - 200}.0")
             self.txt_consola.see("end")
         self.after(400, self._procesar_cola_logs)
+
+    # =========================================================================
+    # SISTEMA AUTOMÁTICO DE REPORTE DE ERRORES Y DIAGNÓSTICO (DESTINO OCULTO)
+    # =========================================================================
+    def _instalar_capturador_errores(self) -> None:
+        """Captura errores inesperados en la interfaz o en hilos secundarios."""
+        self.report_callback_exception = self._capturar_excepcion_tkinter
+
+        def _hook_hilo(args: threading.ExceptHookArgs) -> None:
+            traza = "".join(
+                traceback.format_exception(
+                    args.exc_type, args.exc_value, args.exc_traceback
+                )
+            )
+            titulo = f"{args.exc_type.__name__}: {args.exc_value}"
+            self._registrar_y_notificar_error(titulo, traza)
+
+        threading.excepthook = _hook_hilo
+
+    def _capturar_excepcion_tkinter(
+        self, exc_type: Any, exc_value: Any, exc_tb: Any
+    ) -> None:
+        traza = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        titulo = f"{getattr(exc_type, '__name__', 'Error')}: {exc_value}"
+        self._registrar_y_notificar_error(titulo, traza)
+
+    def _registrar_y_notificar_error(self, titulo: str, traza: str) -> None:
+        self.ultimo_error_titulo = titulo
+        self.ultimo_error_traza = traza
+        if not self.modal_error_abierto:
+            self.after(
+                0,
+                lambda: self._mostrar_ventana_reporte_error(
+                    titulo, traza, es_manual=False
+                ),
+            )
+
+    def _mostrar_ventana_reporte_error(
+        self, titulo_error: str, detalle_traza: str, es_manual: bool = False
+    ) -> None:
+        """
+        Muestra una ventana amigable con el diagnóstico del error y los botones
+        'Mandar Reporte de Error' o 'No Mandar', sin mostrar jamás el correo del desarrollador.
+        """
+        if self.modal_error_abierto and not es_manual:
+            return
+        self.modal_error_abierto = True
+
+        ventana = ctk.CTkToplevel(self)
+        ventana.title("Diagnóstico de Error — Job Finder PC")
+        ventana.geometry("650x500")
+        ventana.minsize(560, 440)
+        ventana.transient(self)
+        ventana.grab_set()
+
+        def _al_cerrar() -> None:
+            self.modal_error_abierto = False
+            ventana.destroy()
+
+        ventana.protocol("WM_DELETE_WINDOW", _al_cerrar)
+
+        encabezado = (
+            "🛠️ Enviar Diagnóstico o Reportar un Problema"
+            if es_manual
+            else "⚠️ Se detectó un error inesperado en la aplicación"
+        )
+        ctk.CTkLabel(
+            ventana,
+            text=encabezado,
+            font=ctk.CTkFont(size=17, weight="bold"),
+            text_color="#f59e0b" if es_manual else "#ef4444",
+        ).pack(anchor="w", padx=20, pady=(16, 4))
+
+        ctk.CTkLabel(
+            ventana,
+            text="A continuación se muestra el diagnóstico técnico de lo que ocurrió.\n"
+            "¿Deseas mandar este diagnóstico al soporte técnico del programa para que podamos solucionarlo?\n"
+            "(No se enviará ninguna contraseña ni archivo personal).",
+            font=ctk.CTkFont(size=12),
+            text_color="gray75",
+            justify="left",
+        ).pack(anchor="w", padx=20, pady=(0, 10))
+
+        ctk.CTkLabel(
+            ventana,
+            text="Motivo / Descripción del problema (puedes agregar un comentario si deseas):",
+            font=ctk.CTkFont(size=12, weight="bold"),
+        ).pack(anchor="w", padx=20, pady=(2, 3))
+
+        ent_resumen = ctk.CTkEntry(ventana, height=34)
+        ent_resumen.pack(fill="x", padx=20, pady=(0, 8))
+        ent_resumen.insert(0, titulo_error)
+
+        ctk.CTkLabel(
+            ventana,
+            text="Detalle técnico del diagnóstico que se enviará:",
+            font=ctk.CTkFont(size=12, weight="bold"),
+        ).pack(anchor="w", padx=20, pady=(2, 3))
+
+        txt_diag = ctk.CTkTextbox(
+            ventana,
+            height=190,
+            font=ctk.CTkFont(family="Consolas", size=11),
+            corner_radius=8,
+        )
+        txt_diag.pack(fill="both", expand=True, padx=20, pady=(0, 10))
+        txt_diag.insert("1.0", detalle_traza)
+
+        lbl_estado_envio = ctk.CTkLabel(
+            ventana, text="", font=ctk.CTkFont(size=12, weight="bold")
+        )
+        lbl_estado_envio.pack(padx=20, pady=(0, 6))
+
+        frame_botones = ctk.CTkFrame(ventana, fg_color="transparent")
+        frame_botones.pack(fill="x", padx=20, pady=(4, 16))
+
+        btn_no_mandar = ctk.CTkButton(
+            frame_botones,
+            text="✖ No Mandar",
+            fg_color="gray35",
+            hover_color="gray25",
+            height=40,
+            width=150,
+            font=ctk.CTkFont(size=13, weight="bold"),
+            command=_al_cerrar,
+        )
+        btn_no_mandar.pack(side="right", padx=(8, 0))
+
+        btn_mandar = ctk.CTkButton(
+            frame_botones,
+            text="📨 Mandar Diagnóstico del Error",
+            fg_color="#10b981",
+            hover_color="#059669",
+            height=40,
+            font=ctk.CTkFont(size=13, weight="bold"),
+        )
+        btn_mandar.pack(side="right", padx=8)
+
+        def _accion_mandar() -> None:
+            resumen_actual = ent_resumen.get().strip() or "Error reportado por usuario"
+            traza_actual = txt_diag.get("1.0", "end").strip()
+            ultimos_logs = self.txt_consola.get("1.0", "end").strip()[-2500:]
+            btn_mandar.configure(state="disabled", text="Enviando diagnóstico...")
+            btn_no_mandar.configure(state="disabled")
+            lbl_estado_envio.configure(
+                text="Enviando reporte de diagnóstico al soporte...",
+                text_color="#3b82f6",
+            )
+
+            def _hilo_envio() -> None:
+                ok, mensaje = enviar_reporte_error_diagnostico(
+                    titulo_error=resumen_actual,
+                    detalle_tecnico=traza_actual,
+                    ultimos_logs=ultimos_logs,
+                )
+
+                def _terminar_ui() -> None:
+                    if not ventana.winfo_exists():
+                        return
+                    if ok:
+                        messagebox.showinfo("Diagnóstico Enviado", mensaje)
+                        _al_cerrar()
+                    else:
+                        btn_mandar.configure(
+                            state="normal", text="📨 Reintentar Mandar Diagnóstico"
+                        )
+                        btn_no_mandar.configure(state="normal", text="Cerrar")
+                        lbl_estado_envio.configure(text=mensaje, text_color="#f59e0b")
+
+                self.after(0, _terminar_ui)
+
+            threading.Thread(target=_hilo_envio, daemon=True).start()
+
+        btn_mandar.configure(command=_accion_mandar)
 
 
 def lanzar_interfaz_escritorio() -> None:

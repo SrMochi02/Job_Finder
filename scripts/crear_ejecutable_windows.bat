@@ -38,6 +38,9 @@ if exist ".env.example" (
 if exist "README.md" (
     copy /Y "README.md" "release_windows\JobFinderPC\LEEME_INSTRUCCIONES.txt" > nul
 )
+if exist "MANUAL_USUARIO.md" (
+    copy /Y "MANUAL_USUARIO.md" "release_windows\JobFinderPC\MANUAL_COMPLETO_DE_USUARIO.md" > nul
+)
 
 (
 echo @echo off

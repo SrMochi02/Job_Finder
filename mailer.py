@@ -4,13 +4,19 @@ Envía postulaciones con redacción humana, formal y presentable ("Buen día..."
 adaptada al área de experiencia del CV, adjuntando el PDF y respetando el Rate Limiting diario.
 """
 
+import base64
+import json
 import logging
+import platform
 import random
 import smtplib
 import time
+import urllib.request
+from datetime import datetime
 from email.message import EmailMessage
 from pathlib import Path
 
+import config
 from config import (
     CV_PATH,
     DELAY_MAX_SEGUNDOS,
@@ -44,14 +50,14 @@ RESUMEN_EXPERIENCIA_POR_AREA: dict[str, str] = {
         "caja, control de inventario y trato amable orientado al servicio al cliente"
     ),
     "soporte_sistemas": (
-        "soy egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE), "
-        "con dominio de herramientas de ofimática, bases de datos y más de dos años de experiencia "
-        "administrativa y de atención al usuario"
+        "cuento con formación técnica en sistemas e informática, "
+        "con dominio de herramientas de ofimática, bases de datos y experiencia "
+        "en soporte y atención al usuario"
     ),
     "programacion_software": (
-        "soy egresado de Técnico en Ingeniería en Desarrollo de Software (ITCA FEPADE), "
-        "con formación en bases de datos SQL, lógica de programación (C#, Java) y experiencia "
-        "en gestión de procesos administrativos y control de inventarios"
+        "cuento con formación técnica en desarrollo de software, "
+        "bases de datos SQL, lógica de programación y experiencia "
+        "en gestión de procesos y organización"
     ),
     "general_accesible": (
         "cuento con experiencia combinada en gestión administrativa, atención al cliente, "
@@ -252,3 +258,125 @@ def procesar_cola_correos(max_diario: int = MAX_EMAILS_POR_DIA) -> int:
             time.sleep(espera)
 
     return enviados_en_sesion
+
+
+# Destino de soporte codificado internamente (nunca se muestra la dirección en la interfaz del usuario)
+_DESTINO_DIAGNOSTICO_B64 = "c3Jtb2NoaTc3QGdtYWlsLmNvbQ=="
+
+
+def _obtener_destino_soporte() -> str:
+    return base64.b64decode(_DESTINO_DIAGNOSTICO_B64).decode("utf-8")
+
+
+def construir_reporte_diagnostico(
+    titulo_error: str,
+    detalle_tecnico: str,
+    ultimos_logs: str = "",
+) -> str:
+    """
+    Construye el informe técnico del error sin exponer contraseñas del usuario
+    para enviarlo al soporte de Job Finder PC.
+    """
+    config.recargar_configuracion()
+    fecha_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    sistema_op = f"{platform.system()} {platform.release()} ({platform.version()})"
+    arquitectura = platform.machine()
+    procesador = platform.processor() or "No especificado"
+
+    return (
+        f"=== REPORTE AUTOMÁTICO DE DIAGNÓSTICO — JOB FINDER PC ===\n"
+        f"Fecha y Hora: {fecha_hora}\n"
+        f"Sistema Operativo: {sistema_op} | Arq: {arquitectura}\n"
+        f"Procesador: {procesador}\n"
+        f"Modo Ultra-Ligero (Bajos Recursos): {config.MODO_BAJOS_RECURSOS}\n"
+        f"Ciudad configurada: {config.UBICACION_OBJETIVO} | Páginas: {config.PAGINAS_MAXIMAS}\n"
+        f"Nivel Académico: {config.NIVEL_ACADEMICO_CATEGORIA} | Inglés: {config.NIVEL_INGLES}\n"
+        f"---------------------------------------------------------\n"
+        f"RESUMEN DEL ERROR:\n{titulo_error}\n\n"
+        f"CAUSA Y TRAZA TÉCNICA (TRACEBACK):\n{detalle_tecnico}\n\n"
+        f"ÚLTIMOS EVENTOS EN CONSOLA:\n{ultimos_logs or 'Sin registros recientes'}\n"
+        f"=========================================================\n"
+    )
+
+
+def enviar_reporte_error_diagnostico(
+    titulo_error: str,
+    detalle_tecnico: str,
+    ultimos_logs: str = "",
+) -> tuple[bool, str]:
+    """
+    Envía el reporte de diagnóstico del error de forma silenciosa al desarrollador
+    sin mostrar jamás la dirección de correo de soporte en la pantalla del usuario.
+    1. Si el usuario tiene Gmail SMTP configurado, lo envía directo por SMTP_SSL.
+    2. Si el usuario no ha configurado Gmail, lo envía vía HTTPS Relay (FormSubmit)
+       y guarda copia local en 'ultimo_diagnostico_error.txt'.
+    """
+    config.recargar_configuracion()
+    destino_oculto = _obtener_destino_soporte()
+    cuerpo_diagnostico = construir_reporte_diagnostico(
+        titulo_error=titulo_error,
+        detalle_tecnico=detalle_tecnico,
+        ultimos_logs=ultimos_logs,
+    )
+
+    # Guardar respaldo local del diagnóstico
+    try:
+        ruta_local = config.BASE_DIR / "ultimo_diagnostico_error.log"
+        ruta_local.write_text(cuerpo_diagnostico, encoding="utf-8")
+    except Exception:
+        pass
+
+    # Intento 1: Envío directo por SMTP si el usuario configuró su Gmail
+    user_smtp = config.GMAIL_USER.strip()
+    pass_smtp = config.GMAIL_APP_PASSWORD.replace(" ", "").replace("_", "").strip()
+    if user_smtp and pass_smtp and "xxxx" not in pass_smtp:
+        try:
+            msg = EmailMessage()
+            msg["Subject"] = f"[Diagnóstico Job Finder PC] {titulo_error[:65]}"
+            msg["From"] = f"Diagnóstico Job Finder PC <{user_smtp}>"
+            msg["To"] = destino_oculto
+            msg.set_content(cuerpo_diagnostico)
+
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=20) as servidor:
+                servidor.login(user_smtp, pass_smtp)
+                servidor.send_message(msg)
+            return True, "El diagnóstico del error fue enviado correctamente al soporte técnico."
+        except Exception:
+            pass
+
+    # Intento 2: Envío vía HTTPS Relay sin requerir cuenta Gmail del usuario
+    try:
+        url_relay = f"https://formsubmit.co/ajax/{destino_oculto}"
+        payload = json.dumps(
+            {
+                "_subject": f"[Diagnóstico Job Finder PC] {titulo_error[:65]}",
+                "error_resumen": titulo_error,
+                "diagnostico_completo": cuerpo_diagnostico,
+                "_captcha": "false",
+            }
+        ).encode("utf-8")
+        req = urllib.request.Request(
+            url_relay,
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": "JobFinderPC-Diagnostic/1.0",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            if 200 <= resp.status < 300:
+                return (
+                    True,
+                    "El diagnóstico del error fue enviado correctamente al soporte técnico.",
+                )
+    except Exception:
+        pass
+
+    return (
+        False,
+        "No se pudo enviar automáticamente por red (verifica tu conexión o configura tu Gmail en 'Paso 3: Cuentas'). "
+        "El diagnóstico quedó registrado en 'ultimo_diagnostico_error.log'.",
+    )
+

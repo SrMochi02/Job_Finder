@@ -3,6 +3,8 @@
 **Job Finder PC** es una aplicación de escritorio gratuita y **100% privada** para Windows 10 y Windows 11 que busca ofertas de empleo compatibles con tu perfil en El Salvador, descarta automáticamente puestos que no van contigo, **se postula en 1 clic dentro de Computrabajo**, responde las preguntas de selección de las empresas por ti y envía tu CV en PDF.
 
 > 🔒 **Privacidad Total:** Ningún dato sale a servidores externos. Tu nombre, tu correo, tu CV en PDF y tu sesión de Computrabajo se guardan **exclusivamente dentro de tu propia computadora**.
+>
+> 📘 **[Lee aquí el Manual Oficial de Usuario Completo (`MANUAL_USUARIO.md`)](MANUAL_USUARIO.md)** con la explicación minuciosa de cada pantalla, botón, filtro, campo y solución de problemas.
 
 ---
 

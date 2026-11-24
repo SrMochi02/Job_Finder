@@ -34,7 +34,7 @@ ESTUDIA_ACTUALMENTE: str = os.getenv("ESTUDIA_ACTUALMENTE", "NO")
 
 # Nivel académico estructurado + detalle libre
 NIVEL_ACADEMICO_CATEGORIA: str = os.getenv(
-    "NIVEL_ACADEMICO_CATEGORIA", "Técnico Universitario / ITCA"
+    "NIVEL_ACADEMICO_CATEGORIA", "Bachillerato General / Técnico"
 )
 FILTRAR_POR_NIVEL_ACADEMICO: bool = os.getenv(
     "FILTRAR_POR_NIVEL_ACADEMICO", "True"
@@ -615,7 +615,7 @@ def recargar_configuracion() -> None:
     POSEE_LICENCIA_VEHICULO = os.getenv("POSEE_LICENCIA_VEHICULO", "NO")
     ESTUDIA_ACTUALMENTE = os.getenv("ESTUDIA_ACTUALMENTE", "NO")
     NIVEL_ACADEMICO_CATEGORIA = os.getenv(
-        "NIVEL_ACADEMICO_CATEGORIA", "Técnico Universitario / ITCA"
+        "NIVEL_ACADEMICO_CATEGORIA", "Bachillerato General / Técnico"
     )
     FILTRAR_POR_NIVEL_ACADEMICO = os.getenv(
         "FILTRAR_POR_NIVEL_ACADEMICO", "True"

@@ -394,11 +394,10 @@ def generar_consejo_preparacion(
         detalle = (
             " ".join(consejos_especificos[:3])
             if consejos_especificos
-            else "Repasa lógica de programación, consultas SQL básicas y cómo explicar tus proyectos de ITCA."
+            else "Repasa lógica de programación, consultas SQL básicas y cómo explicar tus proyectos prácticos."
         )
         return (
-            f"[ALERTA DE PREPARACIÓN SOFTWARE/TI] Tienes 5 años de base técnica (Bachillerato + ITCA), "
-            f"¡sí puedes aplicar! Antes de la entrevista prepárate bien en: {detalle}"
+            f"[PREPARACIÓN SOFTWARE/TI] Antes de la entrevista prepárate bien en: {detalle}"
         )
 
     if area_afinidad == "soporte_sistemas":
@@ -407,22 +406,22 @@ def generar_consejo_preparacion(
             if consejos_especificos
             else "Repasa mantenimiento preventivo, soporte a usuarios, Office y configuración básica de red."
         )
-        return f"[PREPARACIÓN SOPORTE/TI] Combina tu título de ITCA con tu trato al cliente en clínica. {detalle}"
+        return f"[PREPARACIÓN SOPORTE/TI] Combina tu formación técnica con tu experiencia en atención al usuario. {detalle}"
 
     if area_afinidad == "administrativo_atencion":
         return (
-            "Destaca tus más de 2 años en Clínica Cliniciru: cuadre de caja chica sin faltantes, "
-            "facturación, control de agenda y trato amable a clientes."
+            "Destaca tu experiencia en cuadre de caja sin faltantes, "
+            "facturación, control de agenda, organización y trato amable a clientes."
         )
 
     if area_afinidad == "logistica_operaciones":
         return (
-            "Destaca tu experiencia combinada: auditoría física de inventarios y recepción de proveedores "
-            "en clínica + resistencia física, orden y seguridad ocupacional en mantenimiento y carga."
+            "Destaca tu experiencia en auditoría física de inventarios, recepción de proveedores, "
+            "orden en bodega y cumplimiento de normas de seguridad ocupacional."
         )
 
     return (
-        "Destaca tu puntualidad, disponibilidad inmediata en San Miguel, experiencia en atención "
+        "Destaca tu puntualidad, disponibilidad inmediata, experiencia en atención "
         "al cliente, manejo de inventarios y facilidad para aprender rápido."
     )
 
