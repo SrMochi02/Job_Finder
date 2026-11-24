@@ -1,57 +1,54 @@
-# 🚀 Job Finder PC — Asistente Automático para Buscar Empleo (Windows 10 y Windows 11)
+# LEER, POR FAVOR LEE SI USARAS LA APLICACION
 
-**Job Finder PC** es una aplicación de escritorio gratuita y **100% privada** para Windows 10 y Windows 11 que busca ofertas de empleo compatibles con tu perfil en El Salvador, descarta automáticamente puestos que no van contigo, **se postula en 1 clic dentro de Computrabajo**, responde las preguntas de selección de las empresas por ti y envía tu CV en PDF.
+# Job Finder PC (Windows 10 y Windows 11)
 
-> 🔒 **Privacidad Total:** Ningún dato sale a servidores externos. Tu nombre, tu correo, tu CV en PDF y tu sesión de Computrabajo se guardan **exclusivamente dentro de tu propia computadora**.
->
-> 📘 **[Lee aquí el Manual Oficial de Usuario Completo (`MANUAL_USUARIO.md`)](MANUAL_USUARIO.md)** con la explicación minuciosa de cada pantalla, botón, filtro, campo y solución de problemas.
+**Job Finder PC** es una aplicacion de escritorio para Windows 10 y Windows 11 que busca ofertas de trabajo en El Salvador, filtra los empleos segun lo que tu buscas, se postula automaticamente en Computrabajo y responde las preguntas de las empresas por ti.
 
----
+**Manual completo de usuario:** [Haz clic aqui para leer el Manual de Usuario paso a paso (MANUAL_USUARIO.md)](MANUAL_USUARIO.md)
 
-## 📥 Cómo Descargar e Instalar en Windows 10 o Windows 11 (Sin saber programar)
-
-1. Ve a la sección **[Releases](https://github.com/SrMochi02/Job_Finder/releases)** (a la derecha de esta página de GitHub).
-2. Descarga el archivo **`JobFinderPC_Windows10_11.zip`**.
-3. Haz clic derecho sobre el archivo descargado y selecciona **"Extraer todo..."** (Descomprimir).
-4. Entra a la carpeta extraída y haz doble clic en:
-   - **`Instalar_Acceso_Directo.bat`** *(Te creará el ícono **Job Finder PC** en tu Escritorio y abrirá el programa)*, o abre directamente **`JobFinderPC.exe`**.
+**Privacidad:** Todos tus datos personales, tu correo, tu CV en PDF y tu sesion de Computrabajo se guardan unicamente dentro de tu propia computadora. Nadie mas tiene acceso a ellos.
 
 ---
 
-## 🧭 Guía Rápida en 3 Pasos (Dentro de la Aplicación)
+## Como Descargar e Instalar
 
-### 👤 Paso 1: Mis Datos y CV
-- Haz clic en **`📂 Elegir mi CV en PDF...`** y selecciona el archivo PDF de tu currículum.
-- Escribe tu nombre, teléfono, dirección, cuánto deseas ganar, estado civil y un resumen corto de tu experiencia.
-- *¿Para qué sirve?* Cuando una empresa en Computrabajo pregunte *"¿Cuál es su pretensión salarial?"* o *"Coloque su dirección"*, el programa contestará por ti en segundos.
-
-### 🎯 Paso 2: Qué Trabajo Busco
-- Elige tu **Departamento o Ciudad** (*San Miguel, San Salvador, Santa Ana, La Libertad, Soyapango, Santa Tecla, Sonsonate, Usulután, La Unión*, etc.).
-- Marca con un check (`✔`) únicamente los tipos de trabajo a los que sí te quieres postular (*Oficina/Caja/Atención*, *Bodega/Inventario*, *Ventas/Restaurantes*, *Soporte Técnico* o *Programación*).
-- En la caja inferior puedes escribir palabras de empleos que **NO** quieres (por ejemplo: `motorista, cocinero, gerente`).
-
-### 🔑 Paso 3: Conectar Cuentas
-- Haz clic en **`🔑 Abrir Computrabajo e Iniciar Sesión`**.
-- Se abrirá una ventana del navegador: inicia sesión en tu cuenta de Computrabajo y luego **cierra esa ventana**. ¡Tu sesión quedará guardada!
-- *(Opcional)* Si quieres que el programa también envíe tu CV por correo cuando un anuncio incluya el email de Recursos Humanos, puedes agregar tu correo Gmail.
-
-### ⚡ ¡Listo! Dale a Buscar
-- Ve a la pestaña **`▶ Inicio`** y presiona **`⚡ Buscar Trabajo y Postularme Ahora`** (o activa el **`🔄 Modo Automático Continuo`** para que revise ofertas nuevas cada 45 minutos).
-- En la pestaña **`📋 Mis Postulaciones`** podrás ver todas las empresas donde ya te postulaste, abrir el reporte en **Excel** y marcar cuáles te llamaron a entrevista.
+1. Entra a la seccion de **[Releases](https://github.com/SrMochi02/Job_Finder/releases)** en esta pagina de GitHub.
+2. En la parte de abajo (**Assets**), haz clic en **`JobFinderPC_Windows10_11.zip`** para descargarlo.
+3. Ve a tu carpeta de Descargas, haz clic derecho sobre el archivo `.zip` y selecciona **"Extraer todo..."** (Importante: no abras el programa desde adentro del zip sin descomprimirlo primero).
+4. Abre la carpeta descomprimida y haz doble clic en **`Instalar_Acceso_Directo.bat`** (esto creara el acceso directo en tu Escritorio y abrira el programa) o abre directamente **`JobFinderPC.exe`**.
 
 ---
 
-## 🛠️ Ejecución desde Código Fuente (Para Desarrolladores)
+## Como Usar el Programa en 3 Pasos
 
-Si prefieres ejecutarlo o modificarlo desde Python:
+### Paso 1: Mis Datos, Estudios, Idiomas y CV
+Ve a la pestana **"1. Mi Perfil, Idiomas y CV"**:
+- Selecciona el archivo PDF de tu curriculum.
+- Escribe tus datos basicos (nombre, telefono, edad, direccion, cuanto deseas ganar, estado civil, si tienes hijos y si tienes licencia o vehiculo).
+- Selecciona tu **Nivel Academico** y tu **Nivel de Ingles** (tambien puedes agregar otros idiomas).
+- Escribe un resumen corto de tu experiencia y tu carta de presentacion, y presiona **Guardar**.
 
-```bat
-python -m venv venv
-venv\Scripts\pip install -r requirements.txt
-venv\Scripts\python interfaz_pc.py
-```
+### Paso 2: Que Empleo Quiero
+Ve a la pestana **"2. Que Empleo Quiero"**:
+- Elige tu **Departamento o Ciudad** en El Salvador.
+- Si deseas, escribe el **Salario Minimo** que aceptas y los **Puestos Especificos** que te interesan.
+- Marca en la lista de las **16 Categorias de Empleo de El Salvador** los rubros donde quieres trabajar (puedes desplegar cada categoria con el boton **"Ver puestos"** para elegir trabajos especificos).
+- En la caja inferior puedes dejar escritas las palabras de empleos que **NO** quieres (por ejemplo: motorista, cocinero, gerente) y presionar **Guardar**.
 
-Para volver a generar el ejecutable `.exe` y el paquete `.zip` para Windows 10/11:
-```bat
-scripts\crear_ejecutable_windows.bat
-```
+### Paso 3: Conectar Cuentas y Buscar
+Ve a la pestana **"3. Conectar Cuentas"**:
+- Haz clic en **"Abrir Computrabajo e Iniciar Sesion"**. Inicia sesion con tu cuenta en la ventana que se abre y luego **cierra esa ventana del navegador** para que tu sesion quede guardada.
+- (Opcional) Si quieres que el programa envie tu CV por correo cuando una oferta publique el correo de Recursos Humanos, escribe tu Gmail y tu codigo de 16 letras de Google.
+- Finalmente, regresa a **"Panel de Inicio"** y presiona **"Buscar Trabajo y Postularme Ahora"**.
+
+---
+
+## Que Incluye Esta Version
+
+- **Modo Ultra-Ligero (PCs de Bajos Recursos):** Optimizado para funcionar sin trabarse en computadoras con procesador Intel Celeron (2011 en adelante), 2 GB de memoria RAM y disco duro mecanico (HDD).
+- **Busqueda por Interes y Salario:** Permite filtrar tanto por lo que SI quieres (puestos deseados y salario minimo) como por lo que NO quieres.
+- **16 Categorias de Empleo de El Salvador:** Lista desplegable con todos los sectores laborales del pais.
+- **Filtro por Nivel Academico e Idiomas:** Descarta automaticamente ofertas que pidan un titulo universitario superior al tuyo o ingles avanzado si tu nivel es basico.
+- **Historial y Reporte de Errores:** Tabla de empresas postuladas exportable a Excel y ventana para enviar diagnostico de errores si ocurre algun fallo inesperado.
+
+Para cualquier duda sobre cada boton o funcion, revisa el **[Manual de Usuario Completo (MANUAL_USUARIO.md)](MANUAL_USUARIO.md)**.
