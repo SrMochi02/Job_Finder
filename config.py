@@ -1,6 +1,8 @@
 """
 Módulo de configuración del entorno (Fase 1).
-Carga las variables desde el archivo .env de forma aislada y segura.
+Carga las variables desde el archivo .env de forma aislada y segura, e incluye el
+catálogo completo de categorías y puestos de trabajo de El Salvador, niveles de inglés,
+idiomas adicionales, filtros de nivel académico y búsqueda por interés/salario.
 """
 
 import os
@@ -29,10 +31,33 @@ ESTADO_CIVIL_POSTULANTE: str = os.getenv("ESTADO_CIVIL_POSTULANTE", "Soltero(a)"
 RESPUESTA_HIJOS: str = os.getenv("RESPUESTA_HIJOS", "No tengo hijos")
 POSEE_LICENCIA_VEHICULO: str = os.getenv("POSEE_LICENCIA_VEHICULO", "NO")
 ESTUDIA_ACTUALMENTE: str = os.getenv("ESTUDIA_ACTUALMENTE", "NO")
+
+# Nivel académico estructurado + detalle libre
+NIVEL_ACADEMICO_CATEGORIA: str = os.getenv(
+    "NIVEL_ACADEMICO_CATEGORIA", "Técnico Universitario / ITCA"
+)
+FILTRAR_POR_NIVEL_ACADEMICO: bool = os.getenv(
+    "FILTRAR_POR_NIVEL_ACADEMICO", "True"
+).strip().lower() in ("true", "1", "yes")
 NIVEL_ACADEMICO: str = os.getenv(
     "NIVEL_ACADEMICO",
     "Bachiller / Técnico Universitario",
 )
+
+# Idiomas y nivel de inglés
+NIVEL_INGLES: str = os.getenv("NIVEL_INGLES", "A2 - Básico / Pre-Intermedio")
+OTROS_IDIOMAS: str = os.getenv("OTROS_IDIOMAS", "Español (Nativo)")
+
+# Filtros positivos ("Lo que SÍ quiero": puestos deseados y salario mínimo aceptable)
+PUESTOS_INTERES: list[str] = [
+    p.strip().lower()
+    for p in os.getenv("PUESTOS_INTERES", "").split(",")
+    if p.strip()
+]
+SALARIO_MINIMO_FILTRO: int = int(
+    os.getenv("SALARIO_MINIMO_FILTRO", "0").strip() or "0"
+)
+
 RESUMEN_EXPERIENCIA_CV: str = os.getenv(
     "RESUMEN_EXPERIENCIA_CV",
     "Experiencia en atención al cliente, manejo de caja, facturación y control de inventarios.",
@@ -47,7 +72,7 @@ MOTIVO_SALIDA_ULTIMO_EMPLEO: str = os.getenv(
 )
 AREAS_ACTIVA_STR: str = os.getenv(
     "AREAS_ACTIVAS",
-    "administrativo_atencion,logistica_operaciones,ventas_comercial,soporte_sistemas,programacion_software",
+    "administrativo_atencion,logistica_operaciones,ventas_comercial,restaurantes_franquicias,soporte_sistemas,programacion_software",
 )
 AREAS_ACTIVAS: list[str] = [
     a.strip() for a in AREAS_ACTIVA_STR.split(",") if a.strip()
@@ -77,7 +102,7 @@ HEADLESS_SCRAPER: bool = os.getenv("HEADLESS_SCRAPER", "False").strip().lower() 
     "yes",
 )
 
-# Sectores o palabras clave excluidas (cocina pesada/asadores, Pollo Campero/Campestre, conducción/licencia, cargos de supervisión/gerencia, carreras médicas/docencia/mecánica/campo/limpieza)
+# Sectores o palabras clave excluidas por defecto
 _EXCLUIDAS_DEFAULT = (
     "cocinero,cocinera,chef,lavaplatos,asador,parrillero,pupuseria,panadero,pastelero,bartender,steward,"
     "pollo campero,campero,pollo campestre,campestre,"
@@ -95,110 +120,430 @@ PALABRAS_EXCLUIDAS: list[str] = [
     if palabra.strip()
 ]
 
-# Áreas de afinidad asociadas al CV y otros ámbitos laborales accesibles (excepto cocina)
-PERFIL_AFINIDAD_CV: dict[str, list[str]] = {
-    "administrativo_atencion": [
-        "administrativo",
-        "administrativa",
-        "asistente",
-        "auxiliar administrativo",
-        "atencion al cliente",
-        "servicio al cliente",
-        "recepcion",
-        "recepcionista",
-        "caja",
-        "cajero",
-        "cajera",
-        "facturacion",
-        "facturador",
-        "facturadora",
-        "digitador",
-        "digitadora",
-        "oficina",
-        "ofimatica",
-        "agenda",
-        "secretaria",
-        "archivo",
-        "call center",
-        "clinica",
-        "hospital",
-        "cobros",
-        "creditos",
-    ],
-    "logistica_operaciones": [
-        "inventario",
-        "bodega",
-        "bodeguero",
-        "auxiliar de bodega",
-        "almacen",
-        "logistica",
-        "compras",
-        "pedidos",
-        "encomiendas",
-        "proveedores",
-        "despacho",
-        "auxiliar de despacho",
-        "carga",
-        "descarga",
-        "auxiliar de mantenimiento",
-        "operador de bodega",
-        "suministros",
-        "kardex",
-        "empaque",
-    ],
-    "ventas_comercial": [
-        "ventas",
-        "vendedor",
-        "asesor de ventas",
-        "ejecutivo de venta",
-        "ejecutivo de ventas",
-        "dependiente",
-        "atencion en sala",
-        "mostrador",
-        "cajero",
-        "little caesar",
-        "little caesars",
-        "pizza hut",
-        "wendys",
-        "wendy's",
-        "burger king",
-        "burguer king",
-        "kfc",
-        "asociado de restaurante",
-        "equipo de restaurante",
-        "atencion en restaurante",
-    ],
-    "soporte_sistemas": [
-        "soporte tecnico",
-        "tecnico en sistemas",
-        "tecnico en informatica",
-        "tecnico en computacion",
-        "auxiliar de sistemas",
-        "sistemas",
-        "informatica",
-        "computacion",
-        "tecnologia",
-        "it",
-        "ti",
-        "redes",
-        "helpdesk",
-        "mantenimiento de computadoras",
-    ],
-    "programacion_software": [
-        "software",
-        "programador",
-        "desarrollador",
-        "base de datos",
-        "sql",
-        "java",
-        "c#",
-        ".net",
-        "qa",
-        "tester",
-        "web",
-        "junior",
-    ],
+# Catálogo Completo de Categorías Laborales de El Salvador (Desplegable / Checklist en GUI)
+CATALOGO_EMPLEOS_SV: dict[str, dict[str, Any]] = {
+    "administrativo_atencion": {
+        "titulo": "🏢 1. Administración, Oficina, Recepción, Caja y Atención al Cliente",
+        "ejemplos": [
+            "Asistente Administrativo",
+            "Recepcionista",
+            "Cajero / Cajera",
+            "Facturador",
+            "Digitador",
+            "Atención al Cliente",
+            "Auxiliar de Oficina",
+            "Secretaria",
+            "Archivo",
+        ],
+        "keywords": [
+            "administrativo",
+            "administrativa",
+            "asistente",
+            "auxiliar administrativo",
+            "atencion al cliente",
+            "servicio al cliente",
+            "recepcion",
+            "recepcionista",
+            "caja",
+            "cajero",
+            "cajera",
+            "facturacion",
+            "facturador",
+            "facturadora",
+            "digitador",
+            "digitadora",
+            "oficina",
+            "ofimatica",
+            "agenda",
+            "secretaria",
+            "archivo",
+            "tramites",
+        ],
+    },
+    "logistica_operaciones": {
+        "titulo": "📦 2. Bodega, Inventario, Logística, Despacho y Almacén",
+        "ejemplos": [
+            "Auxiliar de Bodega",
+            "Bodeguero",
+            "Control de Inventario",
+            "Auxiliar de Despacho",
+            "Kardex",
+            "Empaque",
+            "Recepción de Mercadería",
+            "Compras / Proveedores",
+        ],
+        "keywords": [
+            "inventario",
+            "bodega",
+            "bodeguero",
+            "auxiliar de bodega",
+            "almacen",
+            "logistica",
+            "compras",
+            "pedidos",
+            "encomiendas",
+            "proveedores",
+            "despacho",
+            "auxiliar de despacho",
+            "carga",
+            "descarga",
+            "auxiliar de mantenimiento",
+            "operador de bodega",
+            "suministros",
+            "kardex",
+            "empaque",
+        ],
+    },
+    "ventas_comercial": {
+        "titulo": "🛍️ 3. Ventas en Sala, Mostrador, Almacenes y Asesoría Comercial",
+        "ejemplos": [
+            "Vendedor de Sala",
+            "Asesor de Ventas",
+            "Ejecutivo de Ventas",
+            "Dependiente de Tienda",
+            "Atención en Mostrador",
+            "Promotor en Punto Fijo",
+        ],
+        "keywords": [
+            "ventas",
+            "vendedor",
+            "vendedora",
+            "asesor de ventas",
+            "ejecutivo de venta",
+            "ejecutivo de ventas",
+            "dependiente",
+            "dependienta",
+            "atencion en sala",
+            "mostrador",
+            "asesor comercial",
+        ],
+    },
+    "restaurantes_franquicias": {
+        "titulo": "🍕 4. Franquicias, Cadenas de Comida Rápida y Atención en Restaurante",
+        "ejemplos": [
+            "Little Caesars",
+            "Pizza Hut",
+            "Wendy's",
+            "Burger King",
+            "KFC",
+            "Starbucks",
+            "Asociado de Restaurante",
+            "Cajero de Restaurante",
+        ],
+        "keywords": [
+            "little caesar",
+            "little caesars",
+            "pizza hut",
+            "wendys",
+            "wendy's",
+            "burger king",
+            "burguer king",
+            "kfc",
+            "starbucks",
+            "papa johns",
+            "subway",
+            "asociado de restaurante",
+            "equipo de restaurante",
+            "atencion en restaurante",
+            "dependiente de restaurante",
+        ],
+    },
+    "soporte_sistemas": {
+        "titulo": "💻 5. Soporte Técnico, Informática, Redes y Sistemas (IT)",
+        "ejemplos": [
+            "Soporte Técnico",
+            "Técnico en Sistemas",
+            "Auxiliar de Informática",
+            "HelpDesk",
+            "Mantenimiento de Computadoras",
+            "Redes",
+        ],
+        "keywords": [
+            "soporte tecnico",
+            "tecnico en sistemas",
+            "tecnico en informatica",
+            "tecnico en computacion",
+            "auxiliar de sistemas",
+            "sistemas",
+            "informatica",
+            "computacion",
+            "tecnologia",
+            "it",
+            "ti",
+            "redes",
+            "helpdesk",
+            "mantenimiento de computadoras",
+        ],
+    },
+    "programacion_software": {
+        "titulo": "🧑‍💻 6. Desarrollo de Software, Programación, Web y Bases de Datos",
+        "ejemplos": [
+            "Programador Junior",
+            "Desarrollador de Software",
+            "Analista de Base de Datos SQL",
+            "Desarrollador Web / C# / Java",
+            "Tester QA",
+        ],
+        "keywords": [
+            "software",
+            "programador",
+            "desarrollador",
+            "base de datos",
+            "sql",
+            "java",
+            "c#",
+            ".net",
+            "python",
+            "javascript",
+            "qa",
+            "tester",
+            "web",
+            "junior",
+            "frontend",
+            "backend",
+        ],
+    },
+    "call_center_bpo": {
+        "titulo": "🎧 7. Call Center, Teleoperador, Atención Telefónica y BPO",
+        "ejemplos": [
+            "Agente de Call Center",
+            "Teleoperador",
+            "Soporte por Chat / Teléfono",
+            "Customer Service Representative",
+            "Agente Bilingüe / Español",
+        ],
+        "keywords": [
+            "call center",
+            "contact center",
+            "teleoperador",
+            "teleoperadora",
+            "customer service",
+            "agente telefonico",
+            "atencion telefonica",
+            "bpo",
+            "chat support",
+        ],
+    },
+    "banca_finanzas_contabilidad": {
+        "titulo": "🏦 8. Banca, Cajas Bancarias, Créditos, Cobros y Contabilidad",
+        "ejemplos": [
+            "Cajero Bancario",
+            "Auxiliar Contable",
+            "Asistente de Contabilidad",
+            "Ejecutivo de Créditos",
+            "Gestor de Cobros",
+            "Auxiliar de Impuestos / IVA",
+        ],
+        "keywords": [
+            "banco",
+            "bancario",
+            "auxiliar contable",
+            "asistente contable",
+            "asistente de contabilidad",
+            "contabilidad",
+            "creditos",
+            "cobros",
+            "cobranza",
+            "impuestos",
+            "planilla",
+            "tesoreria",
+            "finanzas",
+        ],
+    },
+    "supermercados_retail": {
+        "titulo": "🛒 9. Supermercados, Mercaderistas, Display y Gondoleros",
+        "ejemplos": [
+            "Auxiliar de Supermercado",
+            "Mercaderista",
+            "Gondolero",
+            "Impulsador / Display",
+            "Reponedor de Mercadería",
+        ],
+        "keywords": [
+            "supermercado",
+            "mercaderista",
+            "gondolero",
+            "display",
+            "impulsador",
+            "impulsadora",
+            "reponedor",
+            "abarrotes",
+            "autoservicio",
+        ],
+    },
+    "produccion_planta_operarios": {
+        "titulo": "🏭 10. Producción, Operario de Planta, Manufactura y Control de Calidad",
+        "ejemplos": [
+            "Operario de Producción",
+            "Auxiliar de Planta",
+            "Inspector de Calidad",
+            "Empacador de Planta",
+            "Ensamblador",
+        ],
+        "keywords": [
+            "operario",
+            "operaria",
+            "produccion",
+            "planta",
+            "manufactura",
+            "control de calidad",
+            "empacador",
+            "maquila",
+            "ensamble",
+        ],
+    },
+    "salud_clinicas_farmacia": {
+        "titulo": "🏥 11. Clínicas, Hospitales, Recepción Médica y Farmacias",
+        "ejemplos": [
+            "Recepcionista de Clínica",
+            "Asistente de Clínica / Consultorio",
+            "Auxiliar de Farmacia",
+            "Dependiente de Farmacia",
+            "Laboratorio Clínico",
+        ],
+        "keywords": [
+            "clinica",
+            "hospital",
+            "consultorio",
+            "auxiliar de farmacia",
+            "dependiente de farmacia",
+            "farmacia",
+            "enfermeria",
+            "salud",
+            "pacientes",
+        ],
+    },
+    "transporte_reparto_conduccion": {
+        "titulo": "🚚 12. Transporte, Motorista, Reparto, Ruteo y Mensajería",
+        "ejemplos": [
+            "Motorista Licencia Liviana / Pesada",
+            "Auxiliar de Reparto",
+            "Colaborador de Reparto",
+            "Mensajero",
+            "Vendedor Rutero",
+            "Delivery",
+        ],
+        "keywords": [
+            "motorista",
+            "conductor",
+            "chofer",
+            "reparto",
+            "repartidor",
+            "auxiliar de transporte",
+            "colaborador de reparto",
+            "rutero",
+            "mensajero",
+            "delivery",
+        ],
+    },
+    "oficios_mantenimiento_tecnico": {
+        "titulo": "🔧 13. Mantenimiento General, Técnicos, Electricidad, Mecánica y Construcción",
+        "ejemplos": [
+            "Auxiliar de Mantenimiento",
+            "Técnico en Refrigeración / A/C",
+            "Electricista",
+            "Mecánico",
+            "Instalador Técnico",
+            "Construcción",
+        ],
+        "keywords": [
+            "mantenimiento",
+            "refrigeracion",
+            "aire acondicionado",
+            "electricista",
+            "mecanico",
+            "soldador",
+            "instalador",
+            "construccion",
+            "fontanero",
+            "plomero",
+        ],
+    },
+    "marketing_diseno_redes": {
+        "titulo": "🎨 14. Marketing Digital, Redes Sociales, Diseño Gráfico y Publicidad",
+        "ejemplos": [
+            "Ventas por Redes Sociales",
+            "Community Manager",
+            "Diseñador Gráfico",
+            "Asistente de Marketing",
+            "Creador de Contenido",
+        ],
+        "keywords": [
+            "redes sociales",
+            "community manager",
+            "marketing",
+            "mercadeo",
+            "diseno grafico",
+            "disenador",
+            "publicidad",
+            "audiovisual",
+        ],
+    },
+    "recursos_humanos_educacion": {
+        "titulo": "📚 15. Recursos Humanos, Capacitación, Docencia y Psicología",
+        "ejemplos": [
+            "Capacitador",
+            "Asistente de Recursos Humanos",
+            "Reclutador",
+            "Docente / Instructor",
+        ],
+        "keywords": [
+            "recursos humanos",
+            "rrhh",
+            "talento humano",
+            "reclutamiento",
+            "capacitador",
+            "instructor",
+            "docente",
+            "profesor",
+            "maestro",
+        ],
+    },
+    "seguridad_limpieza_servicios": {
+        "titulo": "🛡️ 16. Seguridad, Vigilancia, Ordenanza y Limpieza",
+        "ejemplos": [
+            "Vigilante Interno",
+            "Agente de Seguridad",
+            "Ordenanza",
+            "Auxiliar de Limpieza",
+            "Conserje",
+        ],
+        "keywords": [
+            "vigilante",
+            "seguridad",
+            "ordenanza",
+            "conserje",
+            "limpieza",
+            "aseo",
+        ],
+    },
 }
+
+# Diccionario compatible con parser.py (mapea clave_area -> lista de keywords)
+PERFIL_AFINIDAD_CV: dict[str, list[str]] = {
+    clave: datos["keywords"] for clave, datos in CATALOGO_EMPLEOS_SV.items()
+}
+
+# Niveles Académicos en orden jerárquico (1 = Educación Básica ... 6 = Posgrado)
+NIVELES_ACADEMICOS_ORDEN: dict[str, int] = {
+    "Educación Básica / Noveno Grado": 1,
+    "Bachillerato General / Técnico": 2,
+    "Estudiante Universitario (Activo)": 3,
+    "Técnico Universitario / ITCA": 3,
+    "Egresado Universitario": 4,
+    "Graduado Universitario (Licenciatura / Ingeniería)": 5,
+    "Maestría / Posgrado": 6,
+}
+
+NIVELES_INGLES_LISTA: list[str] = [
+    "Sin inglés (Solo Español)",
+    "A1 - Principiante",
+    "A2 - Básico / Pre-Intermedio",
+    "B1 - Intermedio",
+    "B2 - Intermedio Alto (Call Center / Bilingüe)",
+    "C1 - Avanzado",
+    "C2 - Nativo / Bilingüe Completo",
+]
 
 # Guía práctica de preparación cuando el sistema detecta ofertas de Software / TI
 GUIAS_PREPARACION_TECH: dict[str, str] = {
@@ -241,7 +586,10 @@ def recargar_configuracion() -> None:
     global GMAIL_USER, GMAIL_APP_PASSWORD, REMITENTE_NOMBRE, REMITENTE_TELEFONO
     global DIRECCION_RESIDENCIA, PRETENSION_SALARIAL, ULTIMO_SALARIO, EDAD_POSTULANTE
     global ESTADO_CIVIL_POSTULANTE, RESPUESTA_HIJOS, POSEE_LICENCIA_VEHICULO
-    global ESTUDIA_ACTUALMENTE, NIVEL_ACADEMICO, RESUMEN_EXPERIENCIA_CV, CARTA_PRESENTACION
+    global ESTUDIA_ACTUALMENTE, NIVEL_ACADEMICO, NIVEL_ACADEMICO_CATEGORIA
+    global FILTRAR_POR_NIVEL_ACADEMICO, NIVEL_INGLES, OTROS_IDIOMAS
+    global PUESTOS_INTERES, SALARIO_MINIMO_FILTRO
+    global RESUMEN_EXPERIENCIA_CV, CARTA_PRESENTACION
     global MOTIVO_SALIDA_ULTIMO_EMPLEO, AREAS_ACTIVA_STR, AREAS_ACTIVAS, CV_PATH
     global AUTO_POSTULAR_PORTAL, UBICACION_OBJETIVO, PAGINAS_MAXIMAS, HEADLESS_SCRAPER
     global PALABRAS_EXCLUIDAS, HORA_INICIO_JORNADA, HORA_FIN_JORNADA, INTERVALO_CICLO_MINUTOS
@@ -260,10 +608,26 @@ def recargar_configuracion() -> None:
     RESPUESTA_HIJOS = os.getenv("RESPUESTA_HIJOS", "No tengo hijos")
     POSEE_LICENCIA_VEHICULO = os.getenv("POSEE_LICENCIA_VEHICULO", "NO")
     ESTUDIA_ACTUALMENTE = os.getenv("ESTUDIA_ACTUALMENTE", "NO")
+    NIVEL_ACADEMICO_CATEGORIA = os.getenv(
+        "NIVEL_ACADEMICO_CATEGORIA", "Técnico Universitario / ITCA"
+    )
+    FILTRAR_POR_NIVEL_ACADEMICO = os.getenv(
+        "FILTRAR_POR_NIVEL_ACADEMICO", "True"
+    ).strip().lower() in ("true", "1", "yes")
     NIVEL_ACADEMICO = os.getenv(
         "NIVEL_ACADEMICO",
         "Bachiller / Técnico Universitario",
     )
+    NIVEL_INGLES = os.getenv("NIVEL_INGLES", "A2 - Básico / Pre-Intermedio")
+    OTROS_IDIOMAS = os.getenv("OTROS_IDIOMAS", "Español (Nativo)")
+    PUESTOS_INTERES = [
+        p.strip().lower()
+        for p in os.getenv("PUESTOS_INTERES", "").split(",")
+        if p.strip()
+    ]
+    sal_min_raw = os.getenv("SALARIO_MINIMO_FILTRO", "0").strip()
+    SALARIO_MINIMO_FILTRO = int(sal_min_raw) if sal_min_raw.isdigit() else 0
+
     RESUMEN_EXPERIENCIA_CV = os.getenv(
         "RESUMEN_EXPERIENCIA_CV",
         "Experiencia en atención al cliente, manejo de caja, facturación y control de inventarios.",
@@ -278,7 +642,7 @@ def recargar_configuracion() -> None:
     )
     AREAS_ACTIVA_STR = os.getenv(
         "AREAS_ACTIVAS",
-        "administrativo_atencion,logistica_operaciones,ventas_comercial,soporte_sistemas,programacion_software",
+        "administrativo_atencion,logistica_operaciones,ventas_comercial,restaurantes_franquicias,soporte_sistemas,programacion_software",
     )
     AREAS_ACTIVAS = [a.strip() for a in AREAS_ACTIVA_STR.split(",") if a.strip()]
     CV_PATH = Path(os.getenv("CV_PATH", str(BASE_DIR / "cv_postulante.pdf"))).resolve()
@@ -327,7 +691,12 @@ def guardar_variables_env(nuevos_valores: dict[str, str]) -> None:
         clave, _ = linea.split("=", 1)
         clave_limpia = clave.strip()
         if clave_limpia in nuevos_valores:
-            valor_limpio = str(nuevos_valores[clave_limpia]).replace("\n", " ").replace("\r", "").strip()
+            valor_limpio = (
+                str(nuevos_valores[clave_limpia])
+                .replace("\n", " ")
+                .replace("\r", "")
+                .strip()
+            )
             nuevas_lineas.append(f"{clave_limpia}={valor_limpio}")
             claves_actualizadas.add(clave_limpia)
         else:
@@ -340,4 +709,3 @@ def guardar_variables_env(nuevos_valores: dict[str, str]) -> None:
 
     env_path.write_text("\n".join(nuevas_lineas) + "\n", encoding="utf-8")
     recargar_configuracion()
-

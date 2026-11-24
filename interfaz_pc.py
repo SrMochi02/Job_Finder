@@ -1,8 +1,11 @@
 """
-Interfaz Gráfica Minimalista y Explicativa para PC (Windows 10 y 11) - Job Finder Desktop.
-Diseñada para que cualquier persona, sin conocimientos técnicos, pueda configurar sus datos,
-conectar su cuenta de Computrabajo, elegir qué empleos busca y postularse automáticamente.
-Todos los datos se guardan exclusivamente en la computadora de cada usuario.
+Interfaz Gráfica Moderna, Amigable y Explicativa para PC (Windows 10 y 11) - Job Finder Desktop v1.1.
+Incluye:
+- Búsqueda por Interés Positivo ("Lo que SÍ quiero": puestos deseados, clic rápido en etiquetas y salario mínimo).
+- Catálogo completo de las 16 categorías de empleo de El Salvador en tarjetas desplegables con checklist.
+- Nivel Académico seleccionable + interruptor para filtrar ofertas que exijan títulos superiores.
+- Selector de Nivel de Inglés (Sin inglés, A1, A2, B1, B2, C1, C2) + constructor interactivo para agregar otros idiomas.
+- Diseño moderno con tarjetas estilizadas, navegación lateral con indicador activo y privacidad 100% local.
 """
 
 import logging
@@ -19,6 +22,11 @@ from typing import Any
 import customtkinter as ctk
 
 import config
+from config import (
+    CATALOGO_EMPLEOS_SV,
+    NIVELES_ACADEMICOS_ORDEN,
+    NIVELES_INGLES_LISTA,
+)
 from database import (
     contar_envios_hoy,
     depurar_vacantes_existentes,
@@ -54,17 +62,27 @@ DEPARTAMENTOS_SV = [
     "Cabañas",
 ]
 
-AREAS_LABELS: dict[str, str] = {
-    "administrativo_atencion": "Oficina, Recepción, Caja, Facturación y Atención al Cliente",
-    "logistica_operaciones": "Bodega, Inventarios, Despacho, Logística y Operaciones",
-    "ventas_comercial": "Ventas en Sala, Mostrador, Dependiente y Restaurantes (Pizza Hut, Wendy's, KFC, etc.)",
-    "soporte_sistemas": "Soporte Técnico, Informática, Redes y Mantenimiento de Computadoras",
-    "programacion_software": "Programación, Desarrollo de Software y Bases de Datos (SQL)",
-}
+IDIOMAS_SUGERIDOS = [
+    "Francés",
+    "Portugués",
+    "Italiano",
+    "Alemán",
+    "Chino Mandarín",
+    "Japonés",
+    "Coreano",
+    "Lengua de Señas (LESSA)",
+]
+
+NIVELES_IDIOMA_GENERAL = [
+    "Básico (A1-A2)",
+    "Intermedio (B1-B2)",
+    "Avanzado (C1)",
+    "Nativo / Fluido (C2)",
+]
 
 
 class QueueLogHandler(logging.Handler):
-    """Envía los mensajes del sistema hacia la pantalla principal en lenguaje claro."""
+    """Envía los mensajes del sistema hacia la pantalla principal en tiempo real."""
 
     def __init__(self, log_queue: queue.Queue[str]) -> None:
         super().__init__()
@@ -79,14 +97,14 @@ class QueueLogHandler(logging.Handler):
 
 
 class JobFinderDesktopApp(ctk.CTk):
-    """Ventana principal minimalista y explicativa de Job Finder Desktop."""
+    """Ventana principal moderna y amigable de Job Finder PC."""
 
     def __init__(self) -> None:
         super().__init__()
 
-        self.title("Job Finder PC — Asistente Automático para Buscar Empleo (Windows 10 / 11)")
-        self.geometry("1200x790")
-        self.minsize(1040, 700)
+        self.title("Job Finder PC — Buscador y Auto-Postulador Inteligente de Empleo en El Salvador")
+        self.geometry("1260x830")
+        self.minsize(1080, 720)
 
         inicializar_bd()
         config.recargar_configuracion()
@@ -97,6 +115,7 @@ class JobFinderDesktopApp(ctk.CTk):
         self.ejecutando_jornada = False
         self.detener_evento = threading.Event()
         self.hilo_trabajo: threading.Thread | None = None
+        self.botones_menu: dict[str, ctk.CTkButton] = {}
 
         self._construir_layout_principal()
         self._cargar_valores_en_formularios()
@@ -105,7 +124,7 @@ class JobFinderDesktopApp(ctk.CTk):
 
     def _configurar_logging_gui(self) -> None:
         handler = QueueLogHandler(self.log_queue)
-        handler.setFormatter(logging.Formatter("%(asctime)s  |  %(message)s", "%H:%M:%S"))
+        handler.setFormatter(logging.Formatter("%(asctime)s  •  %(message)s", "%H:%M:%S"))
         root_logger = logging.getLogger()
         root_logger.setLevel(logging.INFO)
         root_logger.addHandler(handler)
@@ -114,73 +133,85 @@ class JobFinderDesktopApp(ctk.CTk):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        # ================== MENÚ LATERAL MINIMALISTA ==================
-        self.sidebar = ctk.CTkFrame(self, width=240, corner_radius=0)
+        # ================== BARRA LATERAL MODERNA ==================
+        self.sidebar = ctk.CTkFrame(
+            self, width=255, corner_radius=0, fg_color=("#ecf0f1", "#111827")
+        )
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         self.sidebar.grid_rowconfigure(7, weight=1)
 
+        frame_brand = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        frame_brand.grid(row=0, column=0, padx=18, pady=(22, 14), sticky="ew")
+
         ctk.CTkLabel(
-            self.sidebar,
+            frame_brand,
             text="🚀 Job Finder PC",
-            font=ctk.CTkFont(size=22, weight="bold"),
-        ).grid(row=0, column=0, padx=20, pady=(24, 2), sticky="w")
+            font=ctk.CTkFont(size=23, weight="bold"),
+        ).pack(anchor="w")
 
         ctk.CTkLabel(
-            self.sidebar,
-            text="Postúlate en automático",
+            frame_brand,
+            text="Tu Asistente Personal de Empleo",
             font=ctk.CTkFont(size=12),
-            text_color="gray70",
-        ).grid(row=1, column=0, padx=20, pady=(0, 18), sticky="w")
+            text_color=("#555555", "#9ca3af"),
+        ).pack(anchor="w", pady=(2, 0))
 
-        self._crear_boton_menu(2, "▶  Inicio y Búsqueda", "Inicio")
-        self._crear_boton_menu(3, "👤  Paso 1: Mis Datos y CV", "Paso 1: Mis Datos")
-        self._crear_boton_menu(4, "🎯  Paso 2: Qué Trabajo Busco", "Paso 2: Qué Busco")
-        self._crear_boton_menu(5, "🔑  Paso 3: Conectar Cuentas", "Paso 3: Cuentas")
-        self._crear_boton_menu(6, "📋  Mis Postulaciones", "Mis Postulaciones")
+        self._crear_boton_menu(1, "▶   Panel de Inicio", "Inicio")
+        self._crear_boton_menu(2, "👤   1. Mi Perfil, Idiomas y CV", "Paso 1: Mi Perfil")
+        self._crear_boton_menu(3, "🎯   2. Qué Empleo Quiero", "Paso 2: Qué Quiero")
+        self._crear_boton_menu(4, "🔑   3. Conectar Cuentas", "Paso 3: Cuentas")
+        self._crear_boton_menu(5, "📋   Mis Postulaciones", "Mis Postulaciones")
 
-        # Tarjeta de privacidad y estado en la barra lateral
-        self.frame_estado_side = ctk.CTkFrame(self.sidebar, corner_radius=10)
+        # Tarjeta de estado y privacidad en la barra lateral
+        self.frame_estado_side = ctk.CTkFrame(
+            self.sidebar, corner_radius=12, fg_color=("#dfe6e9", "#1f2937")
+        )
         self.frame_estado_side.grid(row=8, column=0, padx=14, pady=10, sticky="ew")
 
         self.lbl_estado_motor = ctk.CTkLabel(
             self.frame_estado_side,
-            text="● Estado: Listo para iniciar",
+            text="● Estado: Listo para buscar",
             font=ctk.CTkFont(size=12, weight="bold"),
-            text_color="#f39c12",
+            text_color="#f59e0b",
         )
-        self.lbl_estado_motor.pack(padx=12, pady=(10, 4), anchor="w")
+        self.lbl_estado_motor.pack(padx=14, pady=(12, 4), anchor="w")
 
         self.lbl_resumen_side = ctk.CTkLabel(
             self.frame_estado_side,
-            text="Empleos encontrados: 0\nPostulados hoy: 0",
+            text="Ofertas compatibles: 0\nPostuladas en portal: 0\nLlamadas a entrevista: 0",
             font=ctk.CTkFont(size=12),
             justify="left",
         )
-        self.lbl_resumen_side.pack(padx=12, pady=(0, 8), anchor="w")
+        self.lbl_resumen_side.pack(padx=14, pady=(0, 8), anchor="w")
 
         ctk.CTkLabel(
             self.frame_estado_side,
-            text="🔒 100% Privado: Tus datos se\nguardan solo en tu propia PC.",
-            font=ctk.CTkFont(size=11),
-            text_color="#2ecc71",
+            text="🔒 100% Privado en tu PC\nTus datos no se comparten.",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color="#10b981",
             justify="left",
-        ).pack(padx=12, pady=(0, 10), anchor="w")
+        ).pack(padx=14, pady=(0, 12), anchor="w")
 
         self.menu_tema = ctk.CTkOptionMenu(
             self.sidebar,
-            values=["Modo Oscuro", "Modo Claro"],
+            values=["🌙 Modo Oscuro", "☀️ Modo Claro"],
             command=self._cambiar_tema,
+            height=34,
         )
         self.menu_tema.grid(row=9, column=0, padx=14, pady=(4, 18), sticky="ew")
-        self.menu_tema.set("Modo Oscuro")
+        self.menu_tema.set("🌙 Modo Oscuro")
 
-        # ================== PESTAÑAS PRINCIPALES ==================
-        self.tabview = ctk.CTkTabview(self, corner_radius=12)
+        # ================== CONTENEDOR PRINCIPAL ==================
+        self.tabview = ctk.CTkTabview(
+            self,
+            corner_radius=14,
+            command=self._actualizar_botones_menu_activo,
+        )
         self.tabview.grid(row=0, column=1, padx=16, pady=12, sticky="nsew")
 
         self.tab_panel = self.tabview.add("Inicio")
-        self.tab_perfil = self.tabview.add("Paso 1: Mis Datos")
-        self.tab_rubros = self.tabview.add("Paso 2: Qué Busco")
+        self.tab_perfil = self.tabview.add("Paso 1: Mi Perfil")
+        self.tab_rubros = self.tabview.add("Paso 2: Qué Quiero")
         self.tab_conexiones = self.tabview.add("Paso 3: Cuentas")
         self.tab_empresas = self.tabview.add("Mis Postulaciones")
 
@@ -189,77 +220,105 @@ class JobFinderDesktopApp(ctk.CTk):
         self._construir_tab_rubros()
         self._construir_tab_conexiones()
         self._construir_tab_empresas()
+        self._actualizar_botones_menu_activo()
 
     def _crear_boton_menu(self, fila: int, texto: str, nombre_tab: str) -> None:
         btn = ctk.CTkButton(
             self.sidebar,
             text=texto,
             anchor="w",
-            height=38,
-            fg_color="transparent" if fila > 2 else ["#3B8ED0", "#1F6AA5"],
-            border_width=0 if fila == 2 else 1,
-            command=lambda: self.tabview.set(nombre_tab),
+            height=42,
+            corner_radius=10,
+            font=ctk.CTkFont(size=13, weight="bold"),
+            command=lambda: self._ir_a_pestana(nombre_tab),
         )
         btn.grid(row=fila, column=0, padx=14, pady=5, sticky="ew")
+        self.botones_menu[nombre_tab] = btn
+
+    def _ir_a_pestana(self, nombre_tab: str) -> None:
+        self.tabview.set(nombre_tab)
+        self._actualizar_botones_menu_activo()
+
+    def _actualizar_botones_menu_activo(self) -> None:
+        actual = self.tabview.get()
+        for tab_name, btn in self.botones_menu.items():
+            if tab_name == actual:
+                btn.configure(
+                    fg_color=("#2563eb", "#2563eb"),
+                    text_color="#ffffff",
+                    border_width=0,
+                )
+            else:
+                btn.configure(
+                    fg_color="transparent",
+                    text_color=("#1f2937", "#e5e7eb"),
+                    border_width=1,
+                    border_color=("#cbd5e1", "#374151"),
+                )
 
     def _cambiar_tema(self, seleccion: str) -> None:
         ctk.set_appearance_mode("Light" if "Claro" in seleccion else "Dark")
 
     # =========================================================================
-    # PESTAÑA 0: INICIO Y BÚSQUEDA EN VIVO
+    # PESTAÑA 0: PANEL DE INICIO
     # =========================================================================
     def _construir_tab_panel(self) -> None:
         self.tab_panel.grid_columnconfigure((0, 1, 2, 3), weight=1)
         self.tab_panel.grid_rowconfigure(3, weight=1)
 
-        # Guía rápida de 3 pasos en la parte superior
-        frame_guia = ctk.CTkFrame(self.tab_panel, corner_radius=10)
-        frame_guia.grid(row=0, column=0, columnspan=4, padx=8, pady=(6, 8), sticky="ew")
+        # Banner de bienvenida amigable
+        banner = ctk.CTkFrame(
+            self.tab_panel, corner_radius=12, fg_color=("#dbeafe", "#1e3a8a")
+        )
+        banner.grid(row=0, column=0, columnspan=4, padx=8, pady=(6, 10), sticky="ew")
         ctk.CTkLabel(
-            frame_guia,
-            text="💡 ¿Cómo funciona?  1️⃣ Llena tus datos y sube tu CV en 'Paso 1'   →   "
-            "2️⃣ Elige tu ciudad y áreas en 'Paso 2'   →   "
-            "3️⃣ Inicia sesión en Computrabajo en 'Paso 3' y dale a Buscar.",
+            banner,
+            text="✨ ¡Bienvenido! Configura tu perfil en 3 pasos sencillos:   "
+            "1️⃣ Pon tus datos, estudios e idiomas   →   "
+            "2️⃣ Marca qué trabajo y salario buscas   →   "
+            "3️⃣ Conecta Computrabajo y dale a Buscar.",
             font=ctk.CTkFont(size=12, weight="bold"),
-            text_color="#5dade2",
-        ).pack(padx=14, pady=10, anchor="w")
+            text_color=("#1e40af", "#bfdbfe"),
+        ).pack(padx=16, pady=12, anchor="w")
 
-        # 4 contadores simples
+        # 4 Tarjetas KPI modernas
         self.card_total = self._crear_tarjeta_kpi(
-            self.tab_panel, 0, "Ofertas Compatibles", "0", "#3498db"
+            self.tab_panel, 0, "🔎 Ofertas Compatibles", "0", "#3b82f6"
         )
         self.card_portal = self._crear_tarjeta_kpi(
-            self.tab_panel, 1, "Postuladas en Computrabajo", "0", "#2ecc71"
+            self.tab_panel, 1, "✅ Postuladas en Portal", "0", "#10b981"
         )
         self.card_correos = self._crear_tarjeta_kpi(
-            self.tab_panel, 2, "Correos Enviados Hoy", "0", "#9b59b6"
+            self.tab_panel, 2, "📧 Correos Enviados Hoy", "0", "#8b5cf6"
         )
         self.card_entrevistas = self._crear_tarjeta_kpi(
-            self.tab_panel, 3, "Me Llamaron a Entrevista", "0", "#f1c40f"
+            self.tab_panel, 3, "📞 Llamaron a Entrevista", "0", "#f59e0b"
         )
 
-        # Botones grandes de acción
-        frame_acciones = ctk.CTkFrame(self.tab_panel, corner_radius=10)
+        # Barra de ejecución
+        frame_acciones = ctk.CTkFrame(self.tab_panel, corner_radius=12)
         frame_acciones.grid(row=2, column=0, columnspan=4, padx=8, pady=8, sticky="ew")
 
         self.btn_ciclo_unico = ctk.CTkButton(
             frame_acciones,
             text="⚡ Buscar Trabajo y Postularme Ahora",
             font=ctk.CTkFont(size=14, weight="bold"),
-            fg_color="#27ae60",
-            hover_color="#1e8449",
-            height=42,
+            fg_color="#10b981",
+            hover_color="#059669",
+            height=44,
+            corner_radius=10,
             command=self._iniciar_ciclo_unico_thread,
         )
         self.btn_ciclo_unico.pack(side="left", padx=(14, 8), pady=12)
 
         self.btn_jornada = ctk.CTkButton(
             frame_acciones,
-            text="🔄 Modo Automático Continuo (Revisar cada 45 min)",
+            text="🔄 Modo Automático Continuo (Cada 45 min)",
             font=ctk.CTkFont(size=13, weight="bold"),
-            fg_color="#2980b9",
-            hover_color="#1f618d",
-            height=42,
+            fg_color="#2563eb",
+            hover_color="#1d4ed8",
+            height=44,
+            corner_radius=10,
             command=self._iniciar_jornada_continua_thread,
         )
         self.btn_jornada.pack(side="left", padx=8, pady=12)
@@ -268,166 +327,172 @@ class JobFinderDesktopApp(ctk.CTk):
             frame_acciones,
             text="⏹ Detener",
             font=ctk.CTkFont(size=13, weight="bold"),
-            fg_color="#c0392b",
-            hover_color="#922b21",
-            height=42,
-            width=110,
+            fg_color="#ef4444",
+            hover_color="#dc2626",
+            height=44,
+            width=115,
+            corner_radius=10,
             state="disabled",
             command=self._detener_ejecucion,
         )
         self.btn_detener.pack(side="left", padx=8, pady=12)
 
-        btn_limpiar_log = ctk.CTkButton(
+        ctk.CTkButton(
             frame_acciones,
-            text="Limpiar Pantalla",
+            text="🧹 Limpiar Pantalla",
             fg_color="gray35",
             hover_color="gray25",
-            height=42,
-            width=130,
+            height=44,
+            width=145,
+            corner_radius=10,
             command=self._limpiar_consola,
-        )
-        btn_limpiar_log.pack(side="right", padx=14, pady=12)
+        ).pack(side="right", padx=14, pady=12)
 
-        # Registro de actividad
-        frame_consola = ctk.CTkFrame(self.tab_panel, corner_radius=10)
+        # Consola en vivo
+        frame_consola = ctk.CTkFrame(self.tab_panel, corner_radius=12)
         frame_consola.grid(row=3, column=0, columnspan=4, padx=8, pady=(4, 8), sticky="nsew")
         frame_consola.grid_rowconfigure(1, weight=1)
         frame_consola.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
             frame_consola,
-            text="📺 Lo que el asistente está haciendo en este momento:",
+            text="📺 Actividad en Vivo (Ofertas analizadas, filtros aplicados y respuestas enviadas):",
             font=ctk.CTkFont(size=13, weight="bold"),
-        ).grid(row=0, column=0, padx=14, pady=(10, 4), sticky="w")
+        ).grid(row=0, column=0, padx=16, pady=(12, 4), sticky="w")
 
         self.txt_consola = ctk.CTkTextbox(
             frame_consola,
             font=ctk.CTkFont(family="Consolas", size=12),
             wrap="word",
+            corner_radius=8,
         )
-        self.txt_consola.grid(row=1, column=0, padx=12, pady=(0, 12), sticky="nsew")
+        self.txt_consola.grid(row=1, column=0, padx=14, pady=(0, 14), sticky="nsew")
         self.txt_consola.insert(
             "end",
-            "¡Hola! Bienvenido a Job Finder PC.\n"
-            "• Si es tu primera vez usando el programa, ve a 'Paso 1: Mis Datos' para poner tu nombre, teléfono y subir tu CV en PDF.\n"
-            "• Tus datos y tu correo son 100% privados: solo se guardan en esta computadora.\n"
-            + "-" * 85
+            "¡Hola! Todo está listo en Job Finder PC.\n"
+            "• Ve a '1. Mi Perfil, Idiomas y CV' para subir tu currículum, indicar tu nivel académico y los idiomas que hablas.\n"
+            "• Ve a '2. Qué Empleo Quiero' para escribir qué puestos deseas, tu salario mínimo y marcar tus categorías.\n"
+            + "─" * 85
             + "\n",
         )
 
     def _crear_tarjeta_kpi(
         self, parent: Any, col: int, titulo: str, valor: str, color: str
     ) -> ctk.CTkLabel:
-        frame = ctk.CTkFrame(parent, corner_radius=10)
+        frame = ctk.CTkFrame(parent, corner_radius=12)
         frame.grid(row=1, column=col, padx=8, pady=4, sticky="ew")
         ctk.CTkLabel(
-            frame, text=titulo, font=ctk.CTkFont(size=12), text_color="gray75"
-        ).pack(padx=14, pady=(10, 2), anchor="w")
+            frame, text=titulo, font=ctk.CTkFont(size=12, weight="bold"), text_color="gray70"
+        ).pack(padx=16, pady=(12, 2), anchor="w")
         lbl_v = ctk.CTkLabel(
             frame,
             text=valor,
-            font=ctk.CTkFont(size=24, weight="bold"),
+            font=ctk.CTkFont(size=26, weight="bold"),
             text_color=color,
         )
-        lbl_v.pack(padx=14, pady=(0, 10), anchor="w")
+        lbl_v.pack(padx=16, pady=(0, 12), anchor="w")
         return lbl_v
 
     # =========================================================================
-    # PESTAÑA 1: PASO 1 - MIS DATOS Y CV
+    # PESTAÑA 1: MI PERFIL, ESTUDIOS, IDIOMAS Y CV
     # =========================================================================
     def _construir_tab_perfil(self) -> None:
-        scroll = ctk.CTkScrollableFrame(self.tab_perfil, corner_radius=10)
+        scroll = ctk.CTkScrollableFrame(self.tab_perfil, corner_radius=12)
         scroll.pack(fill="both", expand=True, padx=6, pady=6)
-        scroll.grid_columnconfigure((0, 1), weight=1)
+        scroll.grid_columnconfigure(0, weight=1)
+
+        # ---- TARJETA 1: ARCHIVO PDF DEL CV ----
+        card_cv = ctk.CTkFrame(scroll, corner_radius=12)
+        card_cv.grid(row=0, column=0, padx=10, pady=(8, 10), sticky="ew")
 
         ctk.CTkLabel(
-            scroll,
-            text="👤 Paso 1: Tu Información y Respuestas para las Empresas",
-            font=ctk.CTkFont(size=17, weight="bold"),
-        ).grid(row=0, column=0, columnspan=2, padx=14, pady=(10, 2), sticky="w")
+            card_cv,
+            text="📄 1. Tu Currículum Vítae (Archivo PDF)",
+            font=ctk.CTkFont(size=15, weight="bold"),
+        ).pack(anchor="w", padx=16, pady=(12, 2))
 
-        ctk.CTkLabel(
-            scroll,
-            text="En Computrabajo muchas empresas hacen preguntas antes de recibir tu CV (por ejemplo: ¿Cuánto deseas ganar? o ¿Dónde vives?).\n"
-            "Llena estos campos una sola vez y el asistente responderá por ti automáticamente.",
-            font=ctk.CTkFont(size=12),
-            text_color="gray75",
-            justify="left",
-        ).grid(row=1, column=0, columnspan=2, padx=14, pady=(0, 12), sticky="w")
-
-        # 1. Subir PDF del CV (Arriba para que sea lo primero y más fácil)
-        frame_cv = ctk.CTkFrame(scroll, corner_radius=10)
-        frame_cv.grid(row=2, column=0, columnspan=2, padx=14, pady=(0, 12), sticky="ew")
-
-        ctk.CTkLabel(
-            frame_cv,
-            text="📄 Tu Currículum (Archivo PDF):",
-            font=ctk.CTkFont(size=13, weight="bold"),
-        ).pack(side="left", padx=14, pady=12)
+        sub_cv = ctk.CTkFrame(card_cv, fg_color="transparent")
+        sub_cv.pack(fill="x", padx=16, pady=(2, 12))
 
         texto_cv_inicial = (
-            f"Listo ({config.CV_PATH.name})"
+            f"✔ Archivo cargado: {config.CV_PATH.name}"
             if config.CV_PATH.exists()
-            else "Aún no has seleccionado tu PDF"
+            else "⚠ Aún no has elegido el archivo PDF de tu CV"
         )
         self.lbl_ruta_cv = ctk.CTkLabel(
-            frame_cv,
+            sub_cv,
             text=texto_cv_inicial,
-            font=ctk.CTkFont(size=12),
-            text_color="#2ecc71" if config.CV_PATH.exists() else "#f39c12",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color="#10b981" if config.CV_PATH.exists() else "#f59e0b",
         )
-        self.lbl_ruta_cv.pack(side="left", padx=8, pady=12)
+        self.lbl_ruta_cv.pack(side="left", pady=4)
 
         ctk.CTkButton(
-            frame_cv,
-            text="📂 Elegir mi CV en PDF...",
+            sub_cv,
+            text="📂 Seleccionar mi CV en PDF...",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            height=36,
             command=self._seleccionar_pdf_cv,
-        ).pack(side="right", padx=14, pady=12)
+        ).pack(side="right")
 
-        # Campos básicos explicados con sencillez
+        # ---- TARJETA 2: DATOS PERSONALES Y SALARIALES ----
+        card_personal = ctk.CTkFrame(scroll, corner_radius=12)
+        card_personal.grid(row=1, column=0, padx=10, pady=8, sticky="ew")
+        card_personal.grid_columnconfigure((0, 1), weight=1)
+
+        ctk.CTkLabel(
+            card_personal,
+            text="👤 2. Datos Personales y Respuestas para 'Preguntas de Selección'",
+            font=ctk.CTkFont(size=15, weight="bold"),
+        ).grid(row=0, column=0, columnspan=2, padx=16, pady=(14, 2), sticky="w")
+
+        ctk.CTkLabel(
+            card_personal,
+            text="Cuando una empresa en Computrabajo te pregunte tu teléfono, dirección, edad o salario esperado, el asistente responderá con estos datos:",
+            font=ctk.CTkFont(size=12),
+            text_color="gray70",
+        ).grid(row=1, column=0, columnspan=2, padx=16, pady=(0, 10), sticky="w")
+
         self.ent_nombre = self._crear_campo(
-            scroll, 3, 0, "Tu Nombre Completo:", "Ejemplo: Juan Pérez"
+            card_personal, 2, 0, "Tu Nombre Completo:", "Ejemplo: Raúl Hernández"
         )
         self.ent_telefono = self._crear_campo(
-            scroll, 3, 1, "Tu Número de Celular / WhatsApp:", "Ejemplo: +503 7000-0000"
+            card_personal, 2, 1, "Tu Celular / WhatsApp:", "Ejemplo: +503 7000-0000"
         )
-
         self.ent_edad = self._crear_campo(
-            scroll,
-            4,
+            card_personal,
+            3,
             0,
-            "Tu Edad (para no postularte a ofertas que pidan más edad):",
+            "Tu Edad Actual (filtra ofertas que pidan mayor edad):",
             "Ejemplo: 21 años",
         )
         self.ent_direccion = self._crear_campo(
-            scroll,
-            4,
+            card_personal,
+            3,
             1,
             "Tu Dirección o Colonia donde vives:",
-            "Ejemplo: Col. Ciudad Pacífica, San Miguel",
+            "Ejemplo: Residencial La Pradera, San Miguel",
         )
-
         self.ent_pretension = self._crear_campo(
-            scroll,
-            5,
+            card_personal,
+            4,
             0,
-            "¿Cuánto deseas ganar al mes? (Solo el número en dólares):",
+            "¿Cuánto deseas ganar al mes? (USD - solo número):",
             "Ejemplo: 450",
         )
         self.ent_ultimo_salario = self._crear_campo(
-            scroll,
-            5,
+            card_personal,
+            4,
             1,
-            "¿Cuánto ganabas en tu último trabajo? (Solo el número):",
+            "¿Cuánto ganabas en tu último empleo? (USD - solo número):",
             "Ejemplo: 380",
         )
 
-        # Estado civil e hijos
-        frame_ec = ctk.CTkFrame(scroll, fg_color="transparent")
-        frame_ec.grid(row=6, column=0, padx=14, pady=6, sticky="ew")
+        frame_ec = ctk.CTkFrame(card_personal, fg_color="transparent")
+        frame_ec.grid(row=5, column=0, padx=14, pady=6, sticky="ew")
         ctk.CTkLabel(
-            frame_ec, text="Tu Estado Civil:", font=ctk.CTkFont(size=13, weight="bold")
-        ).pack(anchor="w", pady=(0, 4))
+            frame_ec, text="Tu Estado Civil:", font=ctk.CTkFont(size=12, weight="bold")
+        ).pack(anchor="w", pady=(0, 3))
         self.cmb_estado_civil = ctk.CTkComboBox(
             frame_ec,
             values=["Soltero(a)", "Acompañado(a) / Unión libre", "Casado(a)"],
@@ -436,42 +501,74 @@ class JobFinderDesktopApp(ctk.CTk):
         self.cmb_estado_civil.pack(fill="x")
 
         self.ent_hijos = self._crear_campo(
-            scroll,
-            6,
+            card_personal,
+            5,
             1,
-            "Si preguntan '¿Tiene hijos?', ¿qué deseas responder?:",
-            "Ejemplo: No tengo hijos  /  Sí, 1 hijo",
+            "Si preguntan '¿Tiene hijos?', ¿qué responder?:",
+            "Ejemplo: No tengo hijos  /  Sí, esperando una hija",
         )
 
-        # Licencia y estudios actuales
-        frame_lic = ctk.CTkFrame(scroll, fg_color="transparent")
-        frame_lic.grid(row=7, column=0, padx=14, pady=6, sticky="ew")
+        frame_lic = ctk.CTkFrame(card_personal, fg_color="transparent")
+        frame_lic.grid(row=6, column=0, padx=14, pady=(6, 14), sticky="ew")
         ctk.CTkLabel(
             frame_lic,
-            text="¿Tienes Licencia de Conducir o Moto/Carro propio?",
-            font=ctk.CTkFont(size=13, weight="bold"),
-        ).pack(anchor="w", pady=(0, 4))
+            text="¿Posees Licencia de Conducir o Moto/Vehículo propio?",
+            font=ctk.CTkFont(size=12, weight="bold"),
+        ).pack(anchor="w", pady=(0, 3))
         self.cmb_licencia = ctk.CTkComboBox(
             frame_lic,
             values=[
-                "NO (Ignorar empleos que exijan licencia o moto)",
+                "NO (Ignorar empleos que pidan licencia o moto)",
                 "SI (Tengo licencia de conducir y/o vehículo)",
             ],
             height=34,
         )
         self.cmb_licencia.pack(fill="x")
 
-        frame_est = ctk.CTkFrame(scroll, fg_color="transparent")
-        frame_est.grid(row=7, column=1, padx=14, pady=6, sticky="ew")
+        self.ent_motivo_salida = self._crear_campo(
+            card_personal,
+            6,
+            1,
+            "Motivo de salida de tu último trabajo:",
+            "Ejemplo: Finalización de proyecto y superación profesional",
+        )
+
+        # ---- TARJETA 3: NIVEL ACADÉMICO Y FILTRO DE ESTUDIOS ----
+        card_edu = ctk.CTkFrame(scroll, corner_radius=12)
+        card_edu.grid(row=2, column=0, padx=10, pady=8, sticky="ew")
+        card_edu.grid_columnconfigure((0, 1), weight=1)
+
+        ctk.CTkLabel(
+            card_edu,
+            text="🎓 3. Tu Nivel Académico y Filtro de Estudios",
+            font=ctk.CTkFont(size=15, weight="bold"),
+        ).grid(row=0, column=0, columnspan=2, padx=16, pady=(14, 4), sticky="w")
+
+        frame_niv = ctk.CTkFrame(card_edu, fg_color="transparent")
+        frame_niv.grid(row=1, column=0, padx=14, pady=6, sticky="ew")
+        ctk.CTkLabel(
+            frame_niv,
+            text="Selecciona tu Nivel Académico Actual:",
+            font=ctk.CTkFont(size=12, weight="bold"),
+        ).pack(anchor="w", pady=(0, 3))
+        self.cmb_nivel_cat = ctk.CTkComboBox(
+            frame_niv,
+            values=list(NIVELES_ACADEMICOS_ORDEN.keys()),
+            height=34,
+        )
+        self.cmb_nivel_cat.pack(fill="x")
+
+        frame_est = ctk.CTkFrame(card_edu, fg_color="transparent")
+        frame_est.grid(row=1, column=1, padx=14, pady=6, sticky="ew")
         ctk.CTkLabel(
             frame_est,
-            text="¿Estás estudiando actualmente?",
-            font=ctk.CTkFont(size=13, weight="bold"),
-        ).pack(anchor="w", pady=(0, 4))
+            text="¿Estás estudiando actualmente (tienes horarios de clases)?",
+            font=ctk.CTkFont(size=12, weight="bold"),
+        ).pack(anchor="w", pady=(0, 3))
         self.cmb_estudia = ctk.CTkComboBox(
             frame_est,
             values=[
-                "NO (Ya terminé mis estudios - Disponibilidad de horario total)",
+                "NO (Ya egresé/gradué - Disponibilidad completa)",
                 "SI (Estudio actualmente)",
             ],
             height=34,
@@ -479,53 +576,141 @@ class JobFinderDesktopApp(ctk.CTk):
         self.cmb_estudia.pack(fill="x")
 
         self.ent_nivel_academico = self._crear_campo(
-            scroll,
-            8,
+            card_edu,
+            2,
             0,
-            "Tu Nivel de Estudios (Bachillerato, Técnico o Universidad):",
-            "Ejemplo: Bachiller General / Técnico en Software",
+            "Nombre de tu Carrera o Título obtenido (para responder en encuestas):",
+            "Ejemplo: Egresado de Técnico en Desarrollo de Software (ITCA) y Bachiller",
         )
-        self.ent_motivo_salida = self._crear_campo(
-            scroll,
-            8,
+        self.ent_nivel_academico.master.grid_configure(columnspan=2)
+
+        self.var_filtrar_academico = ctk.BooleanVar(value=True)
+        ctk.CTkSwitch(
+            card_edu,
+            text="Usar mi Nivel Académico como filtro (Descartar ofertas que exijan título universitario graduado o maestría si aún no lo tengo)",
+            variable=self.var_filtrar_academico,
+            font=ctk.CTkFont(size=12, weight="bold"),
+        ).grid(row=3, column=0, columnspan=2, padx=16, pady=(6, 14), sticky="w")
+
+        # ---- TARJETA 4: IDIOMAS Y NIVEL DE INGLÉS ----
+        card_idiomas = ctk.CTkFrame(scroll, corner_radius=12)
+        card_idiomas.grid(row=3, column=0, padx=10, pady=8, sticky="ew")
+        card_idiomas.grid_columnconfigure((0, 1), weight=1)
+
+        ctk.CTkLabel(
+            card_idiomas,
+            text="🌎 4. Nivel de Inglés y Otros Idiomas que Hablas",
+            font=ctk.CTkFont(size=15, weight="bold"),
+        ).grid(row=0, column=0, columnspan=2, padx=16, pady=(14, 2), sticky="w")
+
+        ctk.CTkLabel(
+            card_idiomas,
+            text="El asistente usará tu nivel de inglés para responder encuestas y para descartar plazas 100% bilingües si tu nivel es básico.",
+            font=ctk.CTkFont(size=12),
+            text_color="gray70",
+        ).grid(row=1, column=0, columnspan=2, padx=16, pady=(0, 8), sticky="w")
+
+        frame_ing = ctk.CTkFrame(card_idiomas, fg_color="transparent")
+        frame_ing.grid(row=2, column=0, padx=14, pady=6, sticky="ew")
+        ctk.CTkLabel(
+            frame_ing,
+            text="Tu Nivel de Inglés:",
+            font=ctk.CTkFont(size=12, weight="bold"),
+        ).pack(anchor="w", pady=(0, 3))
+        self.cmb_ingles = ctk.CTkComboBox(
+            frame_ing,
+            values=NIVELES_INGLES_LISTA,
+            height=34,
+        )
+        self.cmb_ingles.pack(fill="x")
+
+        self.ent_otros_idiomas = self._crear_campo(
+            card_idiomas,
+            2,
             1,
-            "¿Por qué saliste de tu último trabajo?:",
-            "Ejemplo: Finalización de contrato y superación personal",
+            "Idiomas que dominas y su nivel (puedes escribir o usar el botón de abajo):",
+            "Ejemplo: Español (Nativo), Francés (Básico)",
         )
 
-        # Resumen corto de experiencia
+        # Constructor rápido para agregar otro idioma con 1 clic
+        frame_add_lang = ctk.CTkFrame(card_idiomas, fg_color="transparent")
+        frame_add_lang.grid(
+            row=3, column=0, columnspan=2, padx=14, pady=(4, 14), sticky="ew"
+        )
         ctk.CTkLabel(
-            scroll,
-            text="Breve resumen de tu experiencia (para responder cuando pregunten en qué has trabajado):",
-            font=ctk.CTkFont(size=13, weight="bold"),
-        ).grid(row=9, column=0, columnspan=2, padx=14, pady=(10, 4), sticky="w")
+            frame_add_lang,
+            text="➕ Agregar otro idioma rápido:",
+            font=ctk.CTkFont(size=12),
+        ).pack(side="left", padx=(0, 8))
 
-        self.txt_experiencia = ctk.CTkTextbox(scroll, height=65)
-        self.txt_experiencia.grid(
-            row=10, column=0, columnspan=2, padx=14, pady=(0, 8), sticky="ew"
+        self.cmb_nuevo_idioma = ctk.CTkComboBox(
+            frame_add_lang, values=IDIOMAS_SUGERIDOS, width=165, height=32
         )
+        self.cmb_nuevo_idioma.pack(side="left", padx=4)
 
-        # Carta de presentación
+        self.cmb_nuevo_idioma_nivel = ctk.CTkComboBox(
+            frame_add_lang, values=NIVELES_IDIOMA_GENERAL, width=165, height=32
+        )
+        self.cmb_nuevo_idioma_nivel.pack(side="left", padx=4)
+
+        ctk.CTkButton(
+            frame_add_lang,
+            text="+ Añadir a mi lista",
+            width=135,
+            height=32,
+            fg_color="#3b82f6",
+            command=self._agregar_idioma_a_lista,
+        ).pack(side="left", padx=8)
+
+        # ---- TARJETA 5: EXPERIENCIA Y CARTA DE PRESENTACIÓN ----
+        card_exp = ctk.CTkFrame(scroll, corner_radius=12)
+        card_exp.grid(row=4, column=0, padx=10, pady=8, sticky="ew")
+
         ctk.CTkLabel(
-            scroll,
-            text="Tu Carta de Presentación (se envía junto con tu CV en los portales):",
-            font=ctk.CTkFont(size=13, weight="bold"),
-        ).grid(row=11, column=0, columnspan=2, padx=14, pady=(6, 4), sticky="w")
+            card_exp,
+            text="📝 5. Resumen de tu Experiencia y Carta de Presentación",
+            font=ctk.CTkFont(size=15, weight="bold"),
+        ).pack(anchor="w", padx=16, pady=(14, 4))
 
-        self.txt_carta = ctk.CTkTextbox(scroll, height=85)
-        self.txt_carta.grid(
-            row=12, column=0, columnspan=2, padx=14, pady=(0, 10), sticky="ew"
-        )
+        ctk.CTkLabel(
+            card_exp,
+            text="Resumen corto de tu experiencia laboral (se usa cuando preguntan '¿Tiene experiencia en caja / bodega / atención?'):",
+            font=ctk.CTkFont(size=12, weight="bold"),
+        ).pack(anchor="w", padx=16, pady=(4, 3))
+
+        self.txt_experiencia = ctk.CTkTextbox(card_exp, height=65, corner_radius=8)
+        self.txt_experiencia.pack(fill="x", padx=16, pady=(0, 10))
+
+        ctk.CTkLabel(
+            card_exp,
+            text="Tu Carta de Presentación (se envía automáticamente cuando una oferta la solicita):",
+            font=ctk.CTkFont(size=12, weight="bold"),
+        ).pack(anchor="w", padx=16, pady=(2, 3))
+
+        self.txt_carta = ctk.CTkTextbox(card_exp, height=80, corner_radius=8)
+        self.txt_carta.pack(fill="x", padx=16, pady=(0, 14))
 
         ctk.CTkButton(
             scroll,
-            text="💾 Guardar Mis Datos",
+            text="💾 Guardar Mi Perfil, Estudios e Idiomas",
             font=ctk.CTkFont(size=15, weight="bold"),
-            fg_color="#27ae60",
-            hover_color="#1e8449",
-            height=44,
+            fg_color="#10b981",
+            hover_color="#059669",
+            height=46,
+            corner_radius=10,
             command=self._guardar_perfil_usuario,
-        ).grid(row=13, column=0, columnspan=2, padx=14, pady=(10, 18), sticky="ew")
+        ).grid(row=5, column=0, padx=10, pady=(10, 20), sticky="ew")
+
+    def _agregar_idioma_a_lista(self) -> None:
+        idioma = self.cmb_nuevo_idioma.get().strip()
+        nivel = self.cmb_nuevo_idioma_nivel.get().strip()
+        if not idioma:
+            return
+        actual = self.ent_otros_idiomas.get().strip()
+        nuevo_item = f"{idioma} ({nivel})"
+        if nuevo_item.lower() not in actual.lower():
+            texto_final = f"{actual}, {nuevo_item}" if actual else nuevo_item
+            self._set_entry(self.ent_otros_idiomas, texto_final)
 
     def _crear_campo(
         self, parent: Any, row: int, col: int, label_text: str, placeholder: str
@@ -552,41 +737,50 @@ class JobFinderDesktopApp(ctk.CTk):
             if origen != destino:
                 shutil.copy2(origen, destino)
             self.lbl_ruta_cv.configure(
-                text=f"Listo ({origen.name})", text_color="#2ecc71"
+                text=f"✔ Archivo cargado: {origen.name}", text_color="#10b981"
             )
             messagebox.showinfo(
                 "Currículum Cargado",
-                f"Tu archivo '{origen.name}' quedó guardado en el programa para tus postulaciones.",
+                f"Tu archivo '{origen.name}' quedó guardado para tus postulaciones.",
             )
         except Exception as exc:
             messagebox.showerror("Error al copiar PDF", str(exc))
 
     # =========================================================================
-    # PESTAÑA 2: PASO 2 - QUÉ TRABAJO BUSCO
+    # PESTAÑA 2: QUÉ EMPLEO QUIERO (FILTRO POSITIVO + 16 CATEGORÍAS EL SALVADOR)
     # =========================================================================
     def _construir_tab_rubros(self) -> None:
-        scroll = ctk.CTkScrollableFrame(self.tab_rubros, corner_radius=10)
+        scroll = ctk.CTkScrollableFrame(self.tab_rubros, corner_radius=12)
         scroll.pack(fill="both", expand=True, padx=6, pady=6)
-        scroll.grid_columnconfigure((0, 1), weight=1)
+        scroll.grid_columnconfigure(0, weight=1)
+
+        # ---- SECCIÓN 1: BÚSQUEDA POR INTERÉS POSITIVO ("LO QUE SÍ QUIERO") ----
+        card_positivo = ctk.CTkFrame(
+            scroll, corner_radius=12, border_width=1, border_color=("#3b82f6", "#1d4ed8")
+        )
+        card_positivo.grid(row=0, column=0, padx=10, pady=(8, 10), sticky="ew")
+        card_positivo.grid_columnconfigure((0, 1, 2), weight=1)
 
         ctk.CTkLabel(
-            scroll,
-            text="🎯 Paso 2: ¿Dónde y en qué áreas quieres trabajar?",
-            font=ctk.CTkFont(size=17, weight="bold"),
-        ).grid(row=0, column=0, columnspan=2, padx=14, pady=(10, 4), sticky="w")
+            card_positivo,
+            text="✨ 1. Búsqueda por Interés: ¿Qué puesto y qué salario QUIERES?",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            text_color=("#1d4ed8", "#60a5fa"),
+        ).grid(row=0, column=0, columnspan=3, padx=16, pady=(14, 2), sticky="w")
 
         ctk.CTkLabel(
-            scroll,
-            text="El asistente solo te postulará a los rubros que marques con un check (✔) y descartará automáticamente todo lo demás.",
+            card_positivo,
+            text="Aquí puedes filtrar en positivo: elige tu ciudad, el salario mínimo que aceptas y escribe los puestos específicos que te interesan.",
             font=ctk.CTkFont(size=12),
-            text_color="gray75",
-        ).grid(row=1, column=0, columnspan=2, padx=14, pady=(0, 12), sticky="w")
+            text_color="gray70",
+        ).grid(row=1, column=0, columnspan=3, padx=16, pady=(0, 10), sticky="w")
 
-        frame_ubi = ctk.CTkFrame(scroll, fg_color="transparent")
+        # Ciudad, Salario mínimo deseado y Páginas
+        frame_ubi = ctk.CTkFrame(card_positivo, fg_color="transparent")
         frame_ubi.grid(row=2, column=0, padx=14, pady=6, sticky="ew")
         ctk.CTkLabel(
             frame_ubi,
-            text="Ciudad o Departamento donde buscas empleo:",
+            text="📍 Departamento / Ciudad en El Salvador:",
             font=ctk.CTkFont(size=12, weight="bold"),
         ).pack(anchor="w", pady=(0, 3))
         self.cmb_ubicacion = ctk.CTkComboBox(
@@ -594,119 +788,264 @@ class JobFinderDesktopApp(ctk.CTk):
         )
         self.cmb_ubicacion.pack(fill="x")
 
-        self.ent_paginas = self._crear_campo(
-            scroll,
+        self.ent_salario_min = self._crear_campo(
+            card_positivo,
             2,
             1,
-            "¿Cuántas páginas de ofertas revisar? (Recomendado: 5 a 8):",
+            "💵 Salario Mínimo que Aceptas (USD, 0 = Cualquiera):",
+            "Ejemplo: 400 (Descarta si pagan menos)",
+        )
+
+        self.ent_paginas = self._crear_campo(
+            card_positivo,
+            2,
+            2,
+            "📄 Páginas a revisar por portal (Recomendado: 8):",
             "Ejemplo: 8",
         )
 
-        # Áreas laborales
-        frame_areas = ctk.CTkFrame(scroll, corner_radius=10)
-        frame_areas.grid(row=3, column=0, columnspan=2, padx=14, pady=10, sticky="ew")
+        # Puestos específicos deseados (Filtro Positivo)
         ctk.CTkLabel(
-            frame_areas,
-            text="✔ Marca los tipos de trabajo que SÍ te interesan:",
-            font=ctk.CTkFont(size=13, weight="bold"),
-        ).pack(anchor="w", padx=14, pady=(12, 6))
+            card_positivo,
+            text="🎯 Puestos o Empresas en los que ESTÁS INTERESADO (Lo que SÍ quieres, separados por coma):",
+            font=ctk.CTkFont(size=12, weight="bold"),
+        ).grid(row=3, column=0, columnspan=3, padx=14, pady=(10, 2), sticky="w")
+
+        ctk.CTkLabel(
+            card_positivo,
+            text="Tip: Puedes escribirlos aquí o hacer clic en los botones de puestos dentro de las categorías desplegables de abajo para agregarlos.",
+            font=ctk.CTkFont(size=11),
+            text_color="gray70",
+        ).grid(row=4, column=0, columnspan=3, padx=14, pady=(0, 4), sticky="w")
+
+        self.ent_puestos_interes = ctk.CTkEntry(
+            card_positivo,
+            placeholder_text="Ejemplo: cajero, auxiliar de bodega, recepcionista, digitador, soporte tecnico, pizza hut, wendys...",
+            height=36,
+        )
+        self.ent_puestos_interes.grid(
+            row=5, column=0, columnspan=3, padx=14, pady=(0, 14), sticky="ew"
+        )
+
+        # ---- SECCIÓN 2: CHECKLIST Y CATEGORÍAS DESPLEGABLES DE TODOS LOS TRABAJOS EN EL SALVADOR ----
+        card_cats = ctk.CTkFrame(scroll, corner_radius=12)
+        card_cats.grid(row=1, column=0, padx=10, pady=8, sticky="ew")
+        card_cats.grid_columnconfigure(0, weight=1)
+
+        header_cats = ctk.CTkFrame(card_cats, fg_color="transparent")
+        header_cats.pack(fill="x", padx=16, pady=(14, 4))
+
+        ctk.CTkLabel(
+            header_cats,
+            text="📂 2. Categorías de Empleo en El Salvador (Checklist + Desplegable de Puestos)",
+            font=ctk.CTkFont(size=16, weight="bold"),
+        ).pack(side="left")
+
+        ctk.CTkButton(
+            header_cats,
+            text="Desmarcar Todas",
+            width=125,
+            height=30,
+            fg_color="gray35",
+            command=lambda: self._marcar_todas_categorias(False),
+        ).pack(side="right", padx=4)
+
+        ctk.CTkButton(
+            header_cats,
+            text="Marcar Todas",
+            width=115,
+            height=30,
+            fg_color="#2563eb",
+            command=lambda: self._marcar_todas_categorias(True),
+        ).pack(side="right", padx=4)
+
+        ctk.CTkLabel(
+            card_cats,
+            text="Marca con un check (✔) las áreas donde quieres buscar trabajo. Haz clic en '▾ Ver puestos' en cualquier categoría para ver todos los trabajos y agregar los que te gusten:",
+            font=ctk.CTkFont(size=12),
+            text_color="gray70",
+            justify="left",
+        ).pack(anchor="w", padx=16, pady=(0, 10))
 
         self.vars_areas: dict[str, ctk.BooleanVar] = {}
-        for clave_area, descripcion_area in AREAS_LABELS.items():
+        self.frames_detalle_cat: dict[str, ctk.CTkFrame] = {}
+
+        for clave_area, info_cat in CATALOGO_EMPLEOS_SV.items():
+            contenedor_cat = ctk.CTkFrame(
+                card_cats, corner_radius=10, fg_color=("#e2e8f0", "#1f2937")
+            )
+            contenedor_cat.pack(fill="x", padx=14, pady=4)
+
+            fila_sup = ctk.CTkFrame(contenedor_cat, fg_color="transparent")
+            fila_sup.pack(fill="x", padx=12, pady=8)
+
             var = ctk.BooleanVar(value=True)
             self.vars_areas[clave_area] = var
-            ctk.CTkCheckBox(
-                frame_areas,
-                text=descripcion_area,
-                variable=var,
-                font=ctk.CTkFont(size=13),
-            ).pack(anchor="w", padx=20, pady=6)
 
-        # Opciones simples
-        frame_switches = ctk.CTkFrame(scroll, corner_radius=10)
-        frame_switches.grid(row=4, column=0, columnspan=2, padx=14, pady=8, sticky="ew")
+            chk = ctk.CTkCheckBox(
+                fila_sup,
+                text=info_cat["titulo"],
+                variable=var,
+                font=ctk.CTkFont(size=13, weight="bold"),
+            )
+            chk.pack(side="left")
+
+            # Panel desplegable oculto inicialmente con los puestos típicos en El Salvador
+            frame_det = ctk.CTkFrame(contenedor_cat, fg_color="transparent")
+            self.frames_detalle_cat[clave_area] = frame_det
+
+            btn_toggle = ctk.CTkButton(
+                fila_sup,
+                text="▾ Ver puestos",
+                width=110,
+                height=26,
+                fg_color=("#cbd5e1", "#374151"),
+                text_color=("#1e293b", "#e5e7eb"),
+                font=ctk.CTkFont(size=11),
+            )
+            btn_toggle.configure(
+                command=lambda k=clave_area, b=btn_toggle: self._alternar_desplegable_categoria(
+                    k, b
+                )
+            )
+            btn_toggle.pack(side="right")
+
+            # Botones tipo "chip" para cada puesto dentro del desplegable
+            ctk.CTkLabel(
+                frame_det,
+                text="Haz clic en un puesto para agregarlo a tu caja de interés ('Lo que SÍ quiero'):",
+                font=ctk.CTkFont(size=11),
+                text_color="gray70",
+            ).pack(anchor="w", padx=10, pady=(2, 4))
+
+            wrap_chips = ctk.CTkFrame(frame_det, fg_color="transparent")
+            wrap_chips.pack(fill="x", padx=8, pady=(0, 8))
+
+            for idx_p, nombre_puesto in enumerate(info_cat["ejemplos"]):
+                chip = ctk.CTkButton(
+                    wrap_chips,
+                    text=f"+ {nombre_puesto}",
+                    height=26,
+                    corner_radius=12,
+                    fg_color=("#3b82f6", "#2563eb"),
+                    hover_color=("#1d4ed8", "#1e40af"),
+                    font=ctk.CTkFont(size=11),
+                    command=lambda p=nombre_puesto, k=clave_area: self._agregar_puesto_interes_chip(
+                        p, k
+                    ),
+                )
+                chip.grid(
+                    row=idx_p // 4, column=idx_p % 4, padx=4, pady=3, sticky="w"
+                )
+
+        # ---- SECCIÓN 3: LO QUE NO QUIERO (FILTRO NEGATIVO) ----
+        card_negativo = ctk.CTkFrame(scroll, corner_radius=12)
+        card_negativo.grid(row=2, column=0, padx=10, pady=8, sticky="ew")
+
+        ctk.CTkLabel(
+            card_negativo,
+            text="🚫 3. Lo que NO Quieres (Puestos o Empresas Bloqueadas)",
+            font=ctk.CTkFont(size=15, weight="bold"),
+        ).pack(anchor="w", padx=16, pady=(14, 2))
+
+        ctk.CTkLabel(
+            card_negativo,
+            text="Cualquier anuncio que tenga una de estas palabras será descartado automáticamente:",
+            font=ctk.CTkFont(size=12),
+            text_color="gray70",
+        ).pack(anchor="w", padx=16, pady=(0, 6))
+
+        self.txt_excluidas = ctk.CTkTextbox(card_negativo, height=95, corner_radius=8)
+        self.txt_excluidas.pack(fill="x", padx=16, pady=(0, 10))
 
         self.var_auto_postular = ctk.BooleanVar(value=True)
         ctk.CTkSwitch(
-            frame_switches,
-            text="Postularme automáticamente en Computrabajo y contestar preguntas por mí",
+            card_negativo,
+            text="Auto-postularme en 1 clic dentro de Computrabajo y responder preguntas de selección",
             variable=self.var_auto_postular,
-            font=ctk.CTkFont(size=13, weight="bold"),
-        ).pack(anchor="w", padx=14, pady=(12, 6))
+            font=ctk.CTkFont(size=12, weight="bold"),
+        ).pack(anchor="w", padx=16, pady=(2, 6))
 
         self.var_ocultar_nav = ctk.BooleanVar(value=False)
         ctk.CTkSwitch(
-            frame_switches,
+            card_negativo,
             text="Ocultar la ventana del navegador mientras busca (Modo silencioso)",
             variable=self.var_ocultar_nav,
             font=ctk.CTkFont(size=12),
-        ).pack(anchor="w", padx=14, pady=(4, 12))
-
-        # Palabras bloqueadas
-        ctk.CTkLabel(
-            scroll,
-            text="🚫 Trabajos o Empresas que NO quieres (separados por coma):",
-            font=ctk.CTkFont(size=13, weight="bold"),
-        ).grid(row=5, column=0, columnspan=2, padx=14, pady=(10, 2), sticky="w")
-
-        ctk.CTkLabel(
-            scroll,
-            text="Si una oferta contiene cualquiera de estas palabras (ej. motorista, cocinero, gerente, pollo campero), el asistente la saltará.",
-            font=ctk.CTkFont(size=12),
-            text_color="gray70",
-        ).grid(row=6, column=0, columnspan=2, padx=14, pady=(0, 6), sticky="w")
-
-        self.txt_excluidas = ctk.CTkTextbox(scroll, height=110)
-        self.txt_excluidas.grid(
-            row=7, column=0, columnspan=2, padx=14, pady=(0, 12), sticky="ew"
-        )
+        ).pack(anchor="w", padx=16, pady=(0, 14))
 
         ctk.CTkButton(
             scroll,
-            text="💾 Guardar Mis Preferencias de Búsqueda",
+            text="💾 Guardar Qué Empleo Quiero y Mis Filtros",
             font=ctk.CTkFont(size=15, weight="bold"),
-            fg_color="#27ae60",
-            hover_color="#1e8449",
-            height=44,
+            fg_color="#10b981",
+            hover_color="#059669",
+            height=46,
+            corner_radius=10,
             command=self._guardar_rubros_y_filtros,
-        ).grid(row=8, column=0, columnspan=2, padx=14, pady=(8, 18), sticky="ew")
+        ).grid(row=3, column=0, padx=10, pady=(10, 20), sticky="ew")
+
+    def _alternar_desplegable_categoria(
+        self, clave_area: str, boton: ctk.CTkButton
+    ) -> None:
+        frame = self.frames_detalle_cat[clave_area]
+        if frame.winfo_ismapped():
+            frame.pack_forget()
+            boton.configure(text="▾ Ver puestos")
+        else:
+            frame.pack(fill="x", padx=12, pady=(0, 8))
+            boton.configure(text="▴ Ocultar puestos")
+
+    def _marcar_todas_categorias(self, estado: bool) -> None:
+        for var in self.vars_areas.values():
+            var.set(estado)
+
+    def _agregar_puesto_interes_chip(self, puesto: str, clave_area: str) -> None:
+        self.vars_areas[clave_area].set(True)
+        actual = self.ent_puestos_interes.get().strip()
+        puesto_clean = puesto.split("/")[0].strip()
+        existentes = [p.strip().lower() for p in actual.split(",") if p.strip()]
+        if puesto_clean.lower() not in existentes:
+            nuevo = f"{actual}, {puesto_clean}" if actual else puesto_clean
+            self._set_entry(self.ent_puestos_interes, nuevo)
 
     # =========================================================================
-    # PESTAÑA 3: PASO 3 - CONECTAR CUENTAS (EXPLICATIVO Y PRIVADO)
+    # PESTAÑA 3: CONECTAR CUENTAS
     # =========================================================================
     def _construir_tab_conexiones(self) -> None:
-        scroll = ctk.CTkScrollableFrame(self.tab_conexiones, corner_radius=10)
+        scroll = ctk.CTkScrollableFrame(self.tab_conexiones, corner_radius=12)
         scroll.pack(fill="both", expand=True, padx=6, pady=6)
         scroll.grid_columnconfigure(0, weight=1)
 
-        # Aviso claro de privacidad
-        frame_priv = ctk.CTkFrame(scroll, corner_radius=10)
-        frame_priv.grid(row=0, column=0, padx=14, pady=(8, 6), sticky="ew")
+        frame_priv = ctk.CTkFrame(
+            scroll, corner_radius=12, fg_color=("#d1fae5", "#064e3b")
+        )
+        frame_priv.grid(row=0, column=0, padx=10, pady=(8, 8), sticky="ew")
         ctk.CTkLabel(
             frame_priv,
-            text="🔒 Privacidad Total: Cada persona que instala este programa ve sus casillas en blanco.\n"
-            "Tu cuenta de Computrabajo, tu correo y tu WhatsApp se guardan únicamente dentro de tu propia computadora. Nadie más tiene acceso a ellos.",
+            text="🔒 Privacidad Garantizada: Tus cuentas y tu correo solo existen en tu propia computadora.\n"
+            "Cuando otra persona instala Job Finder PC, todas estas casillas aparecen completamente en blanco.",
             font=ctk.CTkFont(size=12, weight="bold"),
-            text_color="#2ecc71",
+            text_color=("#065f46", "#a7f3d0"),
             justify="left",
-        ).pack(padx=16, pady=10, anchor="w")
+        ).pack(padx=16, pady=12, anchor="w")
 
-        # 1. Computrabajo (Obligatorio / Principal)
-        frame_ct = ctk.CTkFrame(scroll, corner_radius=10)
-        frame_ct.grid(row=1, column=0, padx=14, pady=8, sticky="ew")
+        # 1. Computrabajo
+        frame_ct = ctk.CTkFrame(scroll, corner_radius=12)
+        frame_ct.grid(row=1, column=0, padx=10, pady=8, sticky="ew")
 
         ctk.CTkLabel(
             frame_ct,
-            text="🌐 1. Conectar tu cuenta de Computrabajo (Recomendado - Solo se hace 1 vez)",
+            text="🌐 1. Conectar tu Cuenta de Computrabajo (Paso Principal)",
             font=ctk.CTkFont(size=15, weight="bold"),
         ).pack(anchor="w", padx=16, pady=(14, 4))
 
         ctk.CTkLabel(
             frame_ct,
-            text="¿Para qué sirve?: Para que el programa pueda darle clic al botón 'Postularme' dentro de Computrabajo con tu cuenta.\n"
-            "¿Cómo se hace?: Haz clic en el botón naranja de abajo, inicia sesión en Computrabajo normalmente y luego CIERRA esa ventana del navegador.",
+            text="Haz clic en el botón naranja, inicia sesión en tu cuenta de Computrabajo y luego CIERRA esa ventana del navegador.\n"
+            "Con eso el asistente ya podrá presionar 'Postularme' y contestar las preguntas de las empresas por ti.",
             font=ctk.CTkFont(size=12),
-            text_color="gray75",
+            text_color="gray70",
             justify="left",
         ).pack(anchor="w", padx=16, pady=(0, 10))
 
@@ -714,29 +1053,29 @@ class JobFinderDesktopApp(ctk.CTk):
             frame_ct,
             text="🔑 Abrir Computrabajo e Iniciar Sesión",
             font=ctk.CTkFont(size=14, weight="bold"),
-            fg_color="#e67e22",
-            hover_color="#d35400",
-            height=40,
+            fg_color="#f59e0b",
+            hover_color="#d97706",
+            height=42,
+            corner_radius=10,
             command=self._abrir_login_computrabajo_thread,
         ).pack(anchor="w", padx=16, pady=(0, 14))
 
-        # 2. Correo Gmail (Explicado paso a paso para una persona normal)
-        frame_gmail = ctk.CTkFrame(scroll, corner_radius=10)
-        frame_gmail.grid(row=2, column=0, padx=14, pady=8, sticky="ew")
+        # 2. Gmail
+        frame_gmail = ctk.CTkFrame(scroll, corner_radius=12)
+        frame_gmail.grid(row=2, column=0, padx=10, pady=8, sticky="ew")
 
         ctk.CTkLabel(
             frame_gmail,
-            text="📧 2. Tu Correo Gmail (Opcional - Para empresas que piden enviar CV por correo)",
+            text="📧 2. Tu Correo Gmail (Opcional - Para ofertas que piden enviar CV por correo)",
             font=ctk.CTkFont(size=15, weight="bold"),
         ).pack(anchor="w", padx=16, pady=(14, 4))
 
         ctk.CTkLabel(
             frame_gmail,
-            text="¿Para qué sirve?: Algunas ofertas dicen 'Interesados enviar CV al correo rrhh@empresa.com'. Si configuras esto, el programa les enviará tu PDF automáticamente.\n"
-            "Nota: Por seguridad, Google no usa tu contraseña normal, sino un código de 16 letras llamado 'Contraseña de Aplicación'.\n"
-            "Si no quieres enviar correos automáticos (y solo quieres postularte en la web de Computrabajo), puedes dejar esto vacío o poner solo tu correo.",
+            text="Si un anuncio incluye el correo de Recursos Humanos (ej. rrhh@empresa.com), el asistente les enviará tu CV en PDF.\n"
+            "Si solo deseas postularte dentro de la web de Computrabajo, puedes dejar el código de 16 letras vacío.",
             font=ctk.CTkFont(size=12),
-            text_color="gray75",
+            text_color="gray70",
             justify="left",
         ).pack(anchor="w", padx=16, pady=(0, 10))
 
@@ -745,13 +1084,13 @@ class JobFinderDesktopApp(ctk.CTk):
         sub_gmail.grid_columnconfigure((0, 1), weight=1)
 
         self.ent_gmail_user = self._crear_campo(
-            sub_gmail, 0, 0, "Tu Correo Electrónico (Gmail):", "tucorreo@gmail.com"
+            sub_gmail, 0, 0, "Tu Correo Gmail:", "tucorreo@gmail.com"
         )
         self.ent_gmail_pass = self._crear_campo(
             sub_gmail,
             0,
             1,
-            "Código de 16 letras de Google (Opcional):",
+            "Código de 16 letras de Google (Contraseña de Aplicación):",
             "xxxx xxxx xxxx xxxx",
         )
         self.ent_gmail_pass.configure(show="*")
@@ -762,19 +1101,18 @@ class JobFinderDesktopApp(ctk.CTk):
         ctk.CTkButton(
             frame_btns_gmail,
             text="💾 Guardar Mi Correo",
-            fg_color="#27ae60",
-            hover_color="#1e8449",
+            fg_color="#10b981",
+            hover_color="#059669",
             command=self._guardar_credenciales_gmail,
         ).pack(side="left", padx=(0, 8))
 
-        self.btn_ver_pass = ctk.CTkButton(
+        ctk.CTkButton(
             frame_btns_gmail,
-            text="👁 Mostrar/Ocultar Código",
+            text="👁 Mostrar / Ocultar Código",
             fg_color="gray35",
-            width=160,
+            width=165,
             command=self._alternar_ver_password_gmail,
-        )
-        self.btn_ver_pass.pack(side="left", padx=6)
+        ).pack(side="left", padx=6)
 
         ctk.CTkButton(
             frame_btns_gmail,
@@ -784,35 +1122,27 @@ class JobFinderDesktopApp(ctk.CTk):
 
         ctk.CTkButton(
             frame_btns_gmail,
-            text="❓ Obtener código de 16 letras en Google",
+            text="❓ Crear código de 16 letras en Google",
             fg_color="gray35",
             command=lambda: webbrowser.open("https://myaccount.google.com/apppasswords"),
         ).pack(side="right")
 
-        # 3. WhatsApp Web (Opcional)
-        frame_wa = ctk.CTkFrame(scroll, corner_radius=10)
-        frame_wa.grid(row=3, column=0, padx=14, pady=8, sticky="ew")
+        # 3. WhatsApp Web
+        frame_wa = ctk.CTkFrame(scroll, corner_radius=12)
+        frame_wa.grid(row=3, column=0, padx=10, pady=8, sticky="ew")
 
         ctk.CTkLabel(
             frame_wa,
-            text="💬 3. WhatsApp Web (Opcional - Déjalo en 0 si prefieres escribir tú mismo por WhatsApp)",
+            text="💬 3. WhatsApp Web (Opcional - Pon 0 si prefieres escribir tú mismo por WhatsApp)",
             font=ctk.CTkFont(size=15, weight="bold"),
         ).pack(anchor="w", padx=16, pady=(14, 4))
 
-        ctk.CTkLabel(
-            frame_wa,
-            text="Si pones el límite en 0, el programa NO enviará mensajes por tu WhatsApp (solo guardará el número de la empresa en la tabla para que tú les escribas si quieres).",
-            font=ctk.CTkFont(size=12),
-            text_color="gray75",
-            justify="left",
-        ).pack(anchor="w", padx=16, pady=(0, 10))
-
         sub_wa = ctk.CTkFrame(frame_wa, fg_color="transparent")
-        sub_wa.pack(fill="x", padx=16, pady=(0, 14))
+        sub_wa.pack(fill="x", padx=16, pady=(4, 14))
 
         ctk.CTkLabel(
             sub_wa,
-            text="Cantidad máxima de WhatsApps automáticos por día (0 = No enviar WhatsApps):",
+            text="Máximo de WhatsApps automáticos por día (0 = Desactivado):",
             font=ctk.CTkFont(size=12, weight="bold"),
         ).pack(side="left", padx=(0, 8))
 
@@ -823,16 +1153,16 @@ class JobFinderDesktopApp(ctk.CTk):
             sub_wa,
             text="Guardar",
             width=100,
-            fg_color="#27ae60",
-            hover_color="#1e8449",
+            fg_color="#10b981",
+            hover_color="#059669",
             command=self._guardar_limite_whatsapp,
         ).pack(side="left", padx=8)
 
         ctk.CTkButton(
             sub_wa,
             text="📱 Vincular QR de WhatsApp Web",
-            fg_color="#16a085",
-            hover_color="#117864",
+            fg_color="#0d9488",
+            hover_color="#0f766e",
             command=self._abrir_login_whatsapp_thread,
         ).pack(side="right")
 
@@ -847,27 +1177,27 @@ class JobFinderDesktopApp(ctk.CTk):
         self.tab_empresas.grid_columnconfigure(0, weight=1)
         self.tab_empresas.grid_rowconfigure(1, weight=1)
 
-        frame_top = ctk.CTkFrame(self.tab_empresas, corner_radius=10)
+        frame_top = ctk.CTkFrame(self.tab_empresas, corner_radius=12)
         frame_top.grid(row=0, column=0, padx=8, pady=8, sticky="ew")
 
         ctk.CTkLabel(
             frame_top,
-            text="📋 Historial de Ofertas y Empresas",
+            text="📋 Historial de Empresas y Postulaciones",
             font=ctk.CTkFont(size=15, weight="bold"),
         ).pack(side="left", padx=14, pady=10)
 
         ctk.CTkButton(
             frame_top,
             text="🔄 Actualizar",
-            width=120,
+            width=115,
             command=self._actualizar_estadisticas_y_tabla,
         ).pack(side="right", padx=10, pady=10)
 
         ctk.CTkButton(
             frame_top,
             text="📊 Abrir en Excel",
-            fg_color="#27ae60",
-            hover_color="#1e8449",
+            fg_color="#10b981",
+            hover_color="#059669",
             width=140,
             command=self._abrir_csv_empresas,
         ).pack(side="right", padx=6, pady=10)
@@ -875,20 +1205,20 @@ class JobFinderDesktopApp(ctk.CTk):
         ctk.CTkButton(
             frame_top,
             text="📞 ¡Me Llamaron a Entrevista!",
-            fg_color="#f39c12",
-            hover_color="#d68910",
+            fg_color="#f59e0b",
+            hover_color="#d97706",
             width=195,
             command=lambda: self._marcar_entrevista_seleccionada("SI"),
         ).pack(side="right", padx=6, pady=10)
 
         ctk.CTkButton(
             frame_top,
-            text="🌐 Ver Anuncio en Internet",
-            width=180,
+            text="🌐 Ver Anuncio en Web",
+            width=175,
             command=self._abrir_url_oferta_seleccionada,
         ).pack(side="right", padx=6, pady=10)
 
-        frame_tabla = ctk.CTkFrame(self.tab_empresas, corner_radius=10)
+        frame_tabla = ctk.CTkFrame(self.tab_empresas, corner_radius=12)
         frame_tabla.grid(row=1, column=0, padx=8, pady=4, sticky="nsew")
         frame_tabla.grid_rowconfigure(0, weight=1)
         frame_tabla.grid_columnconfigure(0, weight=1)
@@ -897,19 +1227,19 @@ class JobFinderDesktopApp(ctk.CTk):
         style.theme_use("default")
         style.configure(
             "Treeview",
-            background="#1e272e",
-            foreground="#ecf0f1",
-            rowheight=30,
-            fieldbackground="#1e272e",
+            background="#1e293b",
+            foreground="#f8fafc",
+            rowheight=32,
+            fieldbackground="#1e293b",
             font=("Segoe UI", 10),
         )
         style.configure(
             "Treeview.Heading",
-            background="#2f3640",
+            background="#0f172a",
             foreground="#ffffff",
             font=("Segoe UI", 10, "bold"),
         )
-        style.map("Treeview", background=[("selected", "#2980b9")])
+        style.map("Treeview", background=[("selected", "#2563eb")])
 
         columnas = (
             "id",
@@ -928,9 +1258,9 @@ class JobFinderDesktopApp(ctk.CTk):
         self.tree.heading("id", text="Código")
         self.tree.heading("empresa", text="Empresa")
         self.tree.heading("titulo", text="Puesto de Trabajo")
-        self.tree.heading("area", text="Rubro")
+        self.tree.heading("area", text="Categoría")
         self.tree.heading("salario", text="Salario")
-        self.tree.heading("postulado_portal", text="¿Ya Postulado?")
+        self.tree.heading("postulado_portal", text="¿Postulado?")
         self.tree.heading("llamaron", text="¿Te Llamaron?")
         self.tree.heading("telefonos", text="Teléfono / Correo")
         self.tree.heading("url", text="Enlace Web")
@@ -969,17 +1299,20 @@ class JobFinderDesktopApp(ctk.CTk):
         if config.POSEE_LICENCIA_VEHICULO.strip().upper().startswith("S"):
             self.cmb_licencia.set("SI (Tengo licencia de conducir y/o vehículo)")
         else:
-            self.cmb_licencia.set("NO (Ignorar empleos que exijan licencia o moto)")
+            self.cmb_licencia.set("NO (Ignorar empleos que pidan licencia o moto)")
 
         if config.ESTUDIA_ACTUALMENTE.strip().upper().startswith("S"):
             self.cmb_estudia.set("SI (Estudio actualmente)")
         else:
-            self.cmb_estudia.set(
-                "NO (Ya terminé mis estudios - Disponibilidad de horario total)"
-            )
+            self.cmb_estudia.set("NO (Ya egresé/gradué - Disponibilidad completa)")
 
+        self.cmb_nivel_cat.set(config.NIVEL_ACADEMICO_CATEGORIA)
+        self.var_filtrar_academico.set(config.FILTRAR_POR_NIVEL_ACADEMICO)
         self._set_entry(self.ent_nivel_academico, config.NIVEL_ACADEMICO)
         self._set_entry(self.ent_motivo_salida, config.MOTIVO_SALIDA_ULTIMO_EMPLEO)
+
+        self.cmb_ingles.set(config.NIVEL_INGLES)
+        self._set_entry(self.ent_otros_idiomas, config.OTROS_IDIOMAS)
 
         self.txt_experiencia.delete("1.0", "end")
         self.txt_experiencia.insert("1.0", config.RESUMEN_EXPERIENCIA_CV)
@@ -988,7 +1321,9 @@ class JobFinderDesktopApp(ctk.CTk):
         self.txt_carta.insert("1.0", config.CARTA_PRESENTACION)
 
         self.cmb_ubicacion.set(config.UBICACION_OBJETIVO)
+        self._set_entry(self.ent_salario_min, str(config.SALARIO_MINIMO_FILTRO))
         self._set_entry(self.ent_paginas, str(config.PAGINAS_MAXIMAS))
+        self._set_entry(self.ent_puestos_interes, ", ".join(config.PUESTOS_INTERES))
 
         areas_activas = set(config.AREAS_ACTIVAS)
         for clave, var in self.vars_areas.items():
@@ -1024,27 +1359,36 @@ class JobFinderDesktopApp(ctk.CTk):
             "RESPUESTA_HIJOS": self.ent_hijos.get().strip(),
             "POSEE_LICENCIA_VEHICULO": lic_val,
             "ESTUDIA_ACTUALMENTE": est_val,
+            "NIVEL_ACADEMICO_CATEGORIA": self.cmb_nivel_cat.get().strip(),
+            "FILTRAR_POR_NIVEL_ACADEMICO": (
+                "True" if self.var_filtrar_academico.get() else "False"
+            ),
             "NIVEL_ACADEMICO": self.ent_nivel_academico.get().strip(),
+            "NIVEL_INGLES": self.cmb_ingles.get().strip(),
+            "OTROS_IDIOMAS": self.ent_otros_idiomas.get().strip(),
             "MOTIVO_SALIDA_ULTIMO_EMPLEO": self.ent_motivo_salida.get().strip(),
             "RESUMEN_EXPERIENCIA_CV": self.txt_experiencia.get("1.0", "end").strip(),
             "CARTA_PRESENTACION": self.txt_carta.get("1.0", "end").strip(),
         }
         config.guardar_variables_env(datos)
         logging.getLogger("gui").info(
-            "Tus datos personales (%s) fueron guardados en esta PC.",
-            config.REMITENTE_NOMBRE or "Usuario",
+            "Perfil guardado: %s | Nivel: %s | Inglés: %s",
+            config.REMITENTE_NOMBRE or "Candidato",
+            config.NIVEL_ACADEMICO_CATEGORIA,
+            config.NIVEL_INGLES,
         )
         messagebox.showinfo(
-            "Datos Guardados",
-            "¡Listo! Tus datos y respuestas automáticas quedaron guardados en tu computadora.",
+            "Perfil Guardado",
+            "¡Listo! Tus datos personales, nivel académico, idiomas y respuestas automáticas se guardaron con éxito.",
         )
 
     def _guardar_rubros_y_filtros(self) -> None:
         seleccionadas = [k for k, v in self.vars_areas.items() if v.get()]
-        if not seleccionadas:
+        intereses_raw = self.ent_puestos_interes.get().strip()
+        if not seleccionadas and not intereses_raw:
             messagebox.showwarning(
-                "Elige al menos un área",
-                "Marca al menos un tipo de trabajo que te interese.",
+                "Elige qué trabajo buscas",
+                "Marca al menos una categoría o escribe un puesto de interés.",
             )
             return
 
@@ -1052,13 +1396,22 @@ class JobFinderDesktopApp(ctk.CTk):
         palabras_limpias = ",".join(
             [p.strip() for p in palabras_raw.split(",") if p.strip()]
         )
+        intereses_limpios = ",".join(
+            [p.strip() for p in intereses_raw.split(",") if p.strip()]
+        )
         paginas_str = self.ent_paginas.get().strip()
         if not paginas_str.isdigit() or int(paginas_str) < 1:
-            paginas_str = "5"
+            paginas_str = "8"
+
+        sal_min_str = self.ent_salario_min.get().strip()
+        if not sal_min_str.isdigit():
+            sal_min_str = "0"
 
         datos = {
             "UBICACION_OBJETIVO": self.cmb_ubicacion.get().strip() or "San Miguel",
+            "SALARIO_MINIMO_FILTRO": sal_min_str,
             "PAGINAS_MAXIMAS": paginas_str,
+            "PUESTOS_INTERES": intereses_limpios,
             "AREAS_ACTIVAS": ",".join(seleccionadas),
             "AUTO_POSTULAR_PORTAL": "True" if self.var_auto_postular.get() else "False",
             "HEADLESS_SCRAPER": "True" if self.var_ocultar_nav.get() else "False",
@@ -1070,7 +1423,7 @@ class JobFinderDesktopApp(ctk.CTk):
         self._actualizar_estadisticas_y_tabla()
         messagebox.showinfo(
             "Preferencias Guardadas",
-            f"¡Listo! El asistente buscará empleos en {config.UBICACION_OBJETIVO} únicamente en las áreas que marcaste.",
+            f"¡Listo! El asistente buscará empleos en {config.UBICACION_OBJETIVO} según tus categorías, puestos de interés y salario mínimo (${config.SALARIO_MINIMO_FILTRO}).",
         )
 
     def _guardar_credenciales_gmail(self) -> None:
@@ -1215,11 +1568,9 @@ class JobFinderDesktopApp(ctk.CTk):
 
     def _detener_ejecucion(self) -> None:
         self.detener_evento.set()
-        logging.getLogger("gui").warning(
-            "Deteniendo al terminar la oferta actual..."
-        )
+        logging.getLogger("gui").warning("Deteniendo al terminar la oferta actual...")
         self.lbl_estado_motor.configure(
-            text="● Estado: Deteniendo...", text_color="#e74c3c"
+            text="● Estado: Deteniendo...", text_color="#ef4444"
         )
 
     def _cambiar_estado_ejecucion(self, activo: bool, texto_estado: str) -> None:
@@ -1228,17 +1579,17 @@ class JobFinderDesktopApp(ctk.CTk):
             self.btn_ciclo_unico.configure(state="disabled")
             self.btn_jornada.configure(state="disabled")
             self.btn_detener.configure(state="normal")
-            self.lbl_estado_motor.configure(text=texto_estado, text_color="#2ecc71")
+            self.lbl_estado_motor.configure(text=texto_estado, text_color="#10b981")
         else:
             self.btn_ciclo_unico.configure(state="normal")
             self.btn_jornada.configure(state="normal")
             self.btn_detener.configure(state="disabled")
             self.lbl_estado_motor.configure(
-                text="● Estado: Listo para iniciar", text_color="#f39c12"
+                text="● Estado: Listo para buscar", text_color="#f59e0b"
             )
 
     def _finalizar_ejecucion_ui(self) -> None:
-        self._cambiar_estado_ejecucion(False, "● Estado: Listo para iniciar")
+        self._cambiar_estado_ejecucion(False, "● Estado: Listo para buscar")
         self._actualizar_estadisticas_y_tabla()
 
     def _actualizar_estadisticas_y_tabla(self) -> None:
@@ -1266,7 +1617,7 @@ class JobFinderDesktopApp(ctk.CTk):
         self.card_entrevistas.configure(text=str(total_entrevistas))
 
         self.lbl_resumen_side.configure(
-            text=f"Empleos encontrados: {total_vacantes}\nPostulados en portal: {total_portal}\nEntrevistas: {total_entrevistas}"
+            text=f"Ofertas compatibles: {total_vacantes}\nPostuladas en portal: {total_portal}\nLlamadas a entrevista: {total_entrevistas}"
         )
 
         for item in self.tree.get_children():

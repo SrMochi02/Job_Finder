@@ -329,12 +329,22 @@ def _determinar_respuesta_cv(pregunta_raw: str) -> dict[str, str]:
             "texto": f"Sí, {config.RESUMEN_EXPERIENCIA_CV}",
         }
 
-    # 16. Estudios, sistemas, computación, Excel, Office o inglés
-    if any(p in q for p in ("excel", "office", "ofimática", "ofimatica", "computación", "computacion", "sistemas", "software", "inglés", "ingles", "estudio", "título", "titulo", "nivel académico", "nivel academico")):
+    # 16. Preguntas sobre Inglés o Idiomas
+    if any(p in q for p in ("inglés", "ingles", "idioma", "idiomas", "bilingüe", "bilingue", "english")):
+        tiene_ing = not config.NIVEL_INGLES.lower().startswith("sin")
+        idiomas_extra = f" | Otros idiomas: {config.OTROS_IDIOMAS}" if config.OTROS_IDIOMAS else ""
+        return {
+            "si_no": "si" if tiene_ing else "no",
+            "numero": "1" if tiene_ing else "0",
+            "texto": f"Nivel de inglés: {config.NIVEL_INGLES}{idiomas_extra}.",
+        }
+
+    # 17. Estudios, sistemas, computación, Excel, Office o Nivel Académico
+    if any(p in q for p in ("excel", "office", "ofimática", "ofimatica", "computación", "computacion", "sistemas", "software", "estudio", "título", "titulo", "nivel académico", "nivel academico", "grado academico", "grado académico")):
         return {
             "si_no": "si",
             "numero": "2",
-            "texto": config.NIVEL_ACADEMICO,
+            "texto": f"{config.NIVEL_ACADEMICO_CATEGORIA} — {config.NIVEL_ACADEMICO}",
         }
 
     # Respuesta general formal basada en el CV para cualquier otra pregunta abierta

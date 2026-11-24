@@ -63,9 +63,32 @@ PATRON_EDAD_MINIMA = re.compile(
     re.IGNORECASE,
 )
 
-# Patrón para detectar salario aproximado en la oferta (ej. $400, $450.00, USD 500)
+# Patrón para detectar salario aproximado en la oferta (ej. $400, $450.00, USD 500, 450.00 US$)
 PATRON_SALARIO = re.compile(
-    r"(?:\$|USD\s*)\s*\d{3,4}(?:[.,]\d{2})?(?:\s*a\s*(?:\$|USD\s*)?\d{3,4}(?:[.,]\d{2})?)?",
+    r"(?:\$|USD\s*)\s*\d{3,4}(?:[.,]\d{2})?(?:\s*a\s*(?:\$|USD\s*)?\d{3,4}(?:[.,]\d{2})?)?"
+    r"|\b\d{3,4}(?:[.,]\d{2})?\s*US\$",
+    re.IGNORECASE,
+)
+
+# Patrones de requisitos académicos o de inglés avanzado en las ofertas
+PATRON_EXIGE_GRADUADO_UNIV = re.compile(
+    r"\b("
+    r"graduado\s+universitario|titulo\s+universitario\s+indispensable|"
+    r"indispensable\s+graduado\s+de\s+licenciatura|indispensable\s+titulo\s+universitario|"
+    r"licenciado\s+en\s+\w+\s+graduado|ingeniero\s+\w+\s+graduado|poseer\s+sello\s+de"
+    r")\b",
+    re.IGNORECASE,
+)
+PATRON_EXIGE_MAESTRIA = re.compile(
+    r"\b(maestria\s+indispensable|postgrado\s+indispensable|posgrado\s+indispensable)\b",
+    re.IGNORECASE,
+)
+PATRON_EXIGE_INGLES_AVANZADO = re.compile(
+    r"\b("
+    r"ingles\s+avanzado|ingles\s+b2|ingles\s+c1|ingles\s+c2|"
+    r"ingles\s+fluido|100%\s+bilingue|bilingue\s+indispensable|"
+    r"advanced\s+english|fluent\s+english"
+    r")\b",
     re.IGNORECASE,
 )
 
@@ -216,24 +239,34 @@ def es_oferta_excluida(
         if re.search(rf"\b{re.escape(cargo_inaccesible)}\b", titulo_norm):
             return True, f"cargo o rubro excluido: '{cargo_inaccesible}'"
 
-    # Verificar que el TÍTULO o EMPRESA pertenezca explícitamente a al menos una de las áreas activas del usuario
+    # Verificar que el TÍTULO o EMPRESA pertenezca a las áreas activas O a los puestos de interés positivos del usuario
     coincide_titulo_cv = False
-    areas_permitidas = config.AREAS_ACTIVAS or list(PERFIL_AFINIDAD_CV.keys())
-    for area, palabras_area in PERFIL_AFINIDAD_CV.items():
-        if area not in areas_permitidas:
-            continue
-        for palabra in palabras_area:
-            palabra_norm = _quitar_acentos(palabra)
-            if re.search(rf"\b{re.escape(palabra_norm)}\b", texto_titulo_empresa):
-                coincide_titulo_cv = True
-                break
-        if coincide_titulo_cv:
+
+    # 1. ¿Coincide con los puestos/intereses positivos que el usuario escribió ("Lo que SÍ quiero")?
+    for interes in config.PUESTOS_INTERES:
+        interes_norm = _quitar_acentos(interes)
+        if interes_norm and re.search(rf"\b{re.escape(interes_norm)}\b", texto_titulo_empresa):
+            coincide_titulo_cv = True
             break
 
+    # 2. ¿Coincide con alguna de las 16 categorías laborales marcadas por el usuario?
     if not coincide_titulo_cv:
-        return True, "el título del puesto no pertenece a tus áreas seleccionadas"
+        areas_permitidas = config.AREAS_ACTIVAS or list(PERFIL_AFINIDAD_CV.keys())
+        for area, palabras_area in PERFIL_AFINIDAD_CV.items():
+            if area not in areas_permitidas:
+                continue
+            for palabra in palabras_area:
+                palabra_norm = _quitar_acentos(palabra)
+                if re.search(rf"\b{re.escape(palabra_norm)}\b", texto_titulo_empresa):
+                    coincide_titulo_cv = True
+                    break
+            if coincide_titulo_cv:
+                break
 
-    # Si ya tenemos la descripción completa, verificar que no exija licencia/vehículo (si el usuario no tiene) ni 4+ años de experiencia
+    if not coincide_titulo_cv:
+        return True, "el título del puesto no pertenece a tus categorías ni puestos de interés seleccionados"
+
+    # Si ya tenemos la descripción completa, verificar licencia, experiencia, edad, salario mínimo, nivel académico e inglés
     if descripcion:
         desc_norm = _quitar_acentos(descripcion)
         posee_licencia = config.POSEE_LICENCIA_VEHICULO.strip().upper().startswith("S")
@@ -258,6 +291,40 @@ def es_oferta_excluida(
                         True,
                         f"exige edad mínima de {edad_min} años ({match_edad.group(0)})",
                     )
+
+        # Verificar filtro de Salario Mínimo Deseado (si la oferta publica salario explícito menor al mínimo del usuario)
+        if config.SALARIO_MINIMO_FILTRO > 0:
+            salarios_hallados = PATRON_SALARIO.findall(descripcion)
+            montos: list[float] = []
+            for s in salarios_hallados:
+                for num_txt in re.findall(r"\b\d{3,4}(?:[.,]\d{2})?\b", s):
+                    try:
+                        val = float(num_txt.replace(",", "."))
+                        if 200 <= val <= 5000:
+                            montos.append(val)
+                    except ValueError:
+                        pass
+            if montos and max(montos) < config.SALARIO_MINIMO_FILTRO:
+                return (
+                    True,
+                    f"ofrece salario (${max(montos):.0f}) menor a tu mínimo deseado (${config.SALARIO_MINIMO_FILTRO})",
+                )
+
+        # Verificar filtro por Nivel Académico (si el usuario activó filtrar por su nivel de estudios)
+        if config.FILTRAR_POR_NIVEL_ACADEMICO:
+            orden_usuario = config.NIVELES_ACADEMICOS_ORDEN.get(
+                config.NIVEL_ACADEMICO_CATEGORIA, 3
+            )
+            if orden_usuario < 6 and PATRON_EXIGE_MAESTRIA.search(desc_norm):
+                return True, "exige Maestría/Posgrado indispensable"
+            if orden_usuario < 5 and PATRON_EXIGE_GRADUADO_UNIV.search(desc_norm):
+                return True, "exige título de Graduado Universitario (Licenciatura/Ingeniería) indispensable"
+
+        # Verificar filtro por Nivel de Inglés (si la oferta exige inglés avanzado/B2/C1 y el usuario tiene A1/A2/B1 o sin inglés)
+        nivel_ing = config.NIVEL_INGLES.upper()
+        usuario_bilingue = any(n in nivel_ing for n in ("B2", "C1", "C2", "AVANZADO", "NATIVO"))
+        if not usuario_bilingue and PATRON_EXIGE_INGLES_AVANZADO.search(desc_norm):
+            return True, f"exige inglés avanzado/bilingüe y tu nivel configurado es '{config.NIVEL_INGLES}'"
 
     return False, ""
 
@@ -292,11 +359,16 @@ def evaluar_afinidad_cv(titulo: str, descripcion: str = "") -> tuple[bool, str]:
             elif descripcion and re.search(patron, texto_completo):
                 puntajes[area] += 1
 
+    for interes in config.PUESTOS_INTERES:
+        interes_norm = _quitar_acentos(interes)
+        if interes_norm and re.search(rf"\b{re.escape(interes_norm)}\b", texto_completo):
+            return True, "puesto_interes_directo"
+
     mejor_area = max(puntajes, key=lambda k: puntajes[k])
     if puntajes[mejor_area] > 0:
         return True, mejor_area
 
-    # Si no coincidió ninguna palabra clave de las 5 áreas del CV, se descarta.
+    # Si no coincidió ninguna palabra clave de las áreas activas ni puestos de interés, se descarta.
     return False, "sin_afinidad"
 
 
